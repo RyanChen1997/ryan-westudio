@@ -78,17 +78,20 @@ export async function createEditorServer({ project, port = 4318, ...input }) {
       pending.set(id, { resolve, reject, timer }); page.send(JSON.stringify({ id, method, payload }));
     });
   }
-  app.get('/api/tools/snapshot', async (_req, res) => res.json(await rpc('snapshot')));
-  app.post('/api/tools/operations', express.json({ limit: '1mb' }), async (req, res) => {
-    const { operations } = req.body ?? {};
-    if (!Array.isArray(operations)) return res.status(422).json({ error: '操作必须是数组' });
-    // Reject the whole batch before dispatching to the only active editor.
-    if (operations.some(op => op?.type === 'replaceImage' ||
-      (op?.block === 'image' && ['insertBlock', 'convertBlock'].includes(op.type)))) {
-      return res.status(422).json({ error: '开源版 AI 工具不能插入或替换图片，请在编辑器中手动操作' });
-    }
-    res.json(await rpc('operations', req.body));
+  app.post('/api/tools/assets', (req, res, next) => {
+    if (!hasBearer(req)) return res.status(401).json({ error: '图片导入需要 AI Bearer 令牌' });
+    if (!req.is('application/octet-stream')) return res.status(415).json({ error: '请直接发送图片字节（Content-Type: application/octet-stream）' });
+    res.locals.editorPage = requireActivePage();
+    next();
+  }, express.raw({ type: 'application/octet-stream', limit: '25mb', inflate: false }), async (req, res) => {
+    const page = requireActivePage(res.locals.editorPage);
+    const asset = await store.addAsset(req.body);
+    // Reply only after the initiating editor has synced and saved the asset.
+    await rpc('syncAsset', { assetId: asset.id }, page);
+    res.status(201).json(asset);
   });
+  app.get('/api/tools/snapshot', async (_req, res) => res.json(await rpc('snapshot')));
+  app.post('/api/tools/operations', express.json({ limit: '1mb' }), async (req, res) => res.json(await rpc('operations', req.body)));
   for (const method of ['save', 'export']) app.post(`/api/tools/${method}`, express.json(), async (req, res) => res.json(await rpc(method, req.body)));
   app.use(express.static(dist));
   app.get('/', (_req, res) => res.sendFile(path.join(dist, 'index.html')));

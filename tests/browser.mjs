@@ -121,28 +121,56 @@ try {
   current = await snapshot(); assert.notEqual(current.nodes.find(n => n.id === imageId).attrs.src, oldRef);
   const newRef = current.nodes.find(n => n.id === imageId).attrs.src;
 
-  // Reject image operations before applying even the valid members of the batch.
-  const beforeImageTools = await snapshot();
-  const empty = await op({ type: 'insertBlock', block: 'paragraph', afterId: styled.id });
-  const nodeId = empty.nodes.find(node => node.type === 'paragraph' && node.text === '').id;
-  const assetId = newRef.slice(6);
-  for (const imageOp of [
-    { type: 'insertBlock', block: 'image', assetId, afterId: styled.id },
-    { type: 'convertBlock', block: 'image', nodeId, assetId },
-    { type: 'replaceImage', nodeId: imageId, assetId },
-  ]) {
-    const result = await request('operations', { expectedRevision: empty.revision, operations: [
-      { type: 'title', text: '不可部分提交' }, imageOp,
-    ] });
-    assert.equal(result.status, 422);
-    assert.match(result.data.error, /不能插入或替换图片/);
-    const after = await snapshot();
-    for (const key of ['revision', 'doc', 'markdown', 'assets']) assert.deepEqual(after[key], empty[key]);
-    assert.equal(runtime.store.current.revision, empty.revision);
-  }
-  current = await op({ type: 'undo' });
-  assert.deepEqual(current.doc, beforeImageTools.doc);
-  await page.reload(); await page.locator(imageSelector).waitFor();
+  // The AI imports local bytes and edits the same active page without using its file chooser.
+  const aiBytes = await sharp({ create: { width: 1200, height: 300, channels: 3, background: '#22aa66' } }).jpeg().toBuffer();
+  const beforeImport = await snapshot();
+  const upload = () => fetch(`${runtime.url}/api/tools/assets`, {
+    method: 'POST', headers: { ...auth, 'Content-Type': 'application/octet-stream' }, body: aiBytes,
+  });
+  const response = await upload();
+  assert.equal(response.status, 201, await response.clone().text());
+  const asset = await response.json();
+  assert.equal(asset.mime, 'image/png');
+  assert.equal((await sharp(await runtime.store.readAsset(asset.id)).metadata()).width, 1080);
+  const afterImport = await snapshot();
+  assert.deepEqual(afterImport.assets[asset.id], asset);
+  assert.deepEqual(runtime.store.current.assets[asset.id], asset);
+  for (const key of ['revision', 'doc', 'markdown', 'selection']) assert.deepEqual(afterImport[key], beforeImport[key]);
+  const repeat = await upload(); assert.equal(repeat.status, 201); assert.deepEqual(await repeat.json(), asset);
+
+  const inserted = await op({ type: 'insertBlock', block: 'image', afterId: styled.id, assetId: asset.id, alt: '由 AI 导入的配图' });
+  const aiNode = inserted.nodes[inserted.nodes.findIndex(node => node.id === styled.id) + 1];
+  assert.equal(aiNode.type, 'image');
+  const aiImage = page.getByAltText('由 AI 导入的配图', { exact: true });
+  await aiImage.waitFor(); await aiImage.evaluate(img => img.decode());
+  assert.equal(inserted.revision, beforeImport.revision + 1);
+  assert.deepEqual((await op({ type: 'undo' })).doc, beforeImport.doc);
+  current = await op({ type: 'redo' });
+
+  const empty = await op({ type: 'insertBlock', block: 'paragraph', afterId: aiNode.id });
+  const blank = empty.nodes[empty.nodes.findIndex(node => node.id === aiNode.id) + 1];
+  assert.equal(blank.type, 'paragraph'); assert.equal(blank.text, '');
+  const invalidAsset = await request('operations', { expectedRevision: empty.revision, operations: [
+    { type: 'title', text: '不能部分提交' },
+    { type: 'convertBlock', block: 'image', nodeId: blank.id, assetId: 'toString' },
+  ] });
+  assert.equal(invalidAsset.status, 422);
+  assert.deepEqual(await snapshot(), empty);
+  assert.equal(runtime.store.current.revision, empty.revision);
+  assert.deepEqual(runtime.store.current.doc, empty.doc);
+  const converted = await op({ type: 'convertBlock', block: 'image', nodeId: blank.id, assetId: newRef.slice(6), alt: 'AI 转换的图片' });
+  const img = converted.nodes.find(node => node.id === blank.id);
+  assert.equal(img.type, 'image'); assert.equal(img.attrs.src, newRef);
+  current = await op({ type: 'replaceImage', nodeId: img.id, assetId: asset.id, expectedImageVersion: img.imageVersion });
+  assert.equal(current.nodes.find(node => node.id === img.id).attrs.src, `asset:${asset.id}`);
+  const staleImage = await request('operations', { expectedRevision: current.revision, operations: [
+    { type: 'title', text: '不可部分提交' },
+    { type: 'replaceImage', nodeId: img.id, assetId: newRef.slice(6), expectedImageVersion: img.imageVersion },
+  ] });
+  assert.equal(staleImage.status, 409);
+  assert.deepEqual((await snapshot()).doc, current.doc);
+  assert.equal(runtime.store.current.revision, current.revision);
+  await page.reload(); await aiImage.waitFor(); await aiImage.evaluate(el => el.decode());
   assert.deepEqual((await snapshot()).doc, current.doc);
 
   const list = current.nodes.find(n => n.type === 'bulletList');
@@ -222,7 +250,8 @@ try {
   assert.equal(switched.doc.attrs.pageMargin, null);
   assert.equal(switched.nodes.filter(n => n.type === 'decoration').length, 0);
   assert.equal(switched.nodes.find(n => n.id === imageId).attrs.src, newRef);
-  await page.locator(imageSelector).first().evaluate(img => img.decode());
+  assert.equal(switched.nodes.find(n => n.id === aiNode.id).attrs.src, `asset:${asset.id}`);
+  await aiImage.evaluate(img => img.decode());
   assert.equal(await page.getByRole('button', { name: '复制到公众号', exact: true }).isEnabled(), true);
   await op({ type: 'replaceText', nodeId: styled.id, from: 0, to: 0, text: '切换后立即复制：' });
   const currentText = (await snapshot()).nodes.find(n => n.id === styled.id).text;

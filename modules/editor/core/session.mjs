@@ -44,6 +44,7 @@ function inlineText(value) {
     ...(index ? [{ type: 'hardBreak' }] : []), ...(line ? [{ type: 'text', text: line }] : []),
   ]);
 }
+const hasImageAsset = (assets, id) => typeof id === 'string' && Object.hasOwn(assets, id);
 function blockJSON(op, assets) {
   const text = op.text === undefined ? '' : requireString(op.text);
   const paragraph = { type: 'paragraph', content: inlineText(text) };
@@ -51,7 +52,7 @@ function blockJSON(op, assets) {
   if (op.block === 'card' || op.block === 'quote') return { type: op.block === 'quote' ? 'blockquote' : 'card', content: [paragraph] };
   if (op.block === 'decoration') return { type: 'decoration', attrs: { kind: 'butterfly' } };
   if (op.block === 'horizontalRule') return { type: 'horizontalRule' };
-  if (op.block === 'image' && assets[op.assetId]) return { type: 'image', attrs: { src: `asset:${op.assetId}`, caption: op.caption === undefined ? '' : requireString(op.caption), alt: op.alt === undefined ? '' : requireString(op.alt) } };
+  if (op.block === 'image' && hasImageAsset(assets, op.assetId)) return { type: 'image', attrs: { src: `asset:${op.assetId}`, caption: op.caption === undefined ? '' : requireString(op.caption), alt: op.alt === undefined ? '' : requireString(op.alt) } };
   throw new SessionError('不支持的新块或资源不存在');
 }
 function focusBlock(tr, pos, node) {
@@ -196,7 +197,7 @@ export class EditorSession {
           case 'replaceImage': {
             const t = locate(tr.doc, op.nodeId);
             if (t.node.type.name !== 'image') throw new SessionError('目标不是图片');
-            if (!this.assets[op.assetId]) throw new SessionError('资源不存在，请先上传');
+            if (!hasImageAsset(this.assets, op.assetId)) throw new SessionError('资源不存在，请先上传');
             if (op.expectedImageVersion !== undefined && op.expectedImageVersion !== this.imageVersion(op.nodeId)) throw new SessionError('图片已被较新的操作更新，忽略过期替换', 409);
             tr.setMeta('imageWrites', [...(tr.getMeta('imageWrites') || []), op.nodeId]);
             tr.setNodeMarkup(t.pos, undefined, { ...t.node.attrs, src: `asset:${op.assetId}`, ...(op.caption !== undefined ? { caption: requireString(op.caption) } : {}), ...(op.alt !== undefined ? { alt: requireString(op.alt) } : {}) }); break;

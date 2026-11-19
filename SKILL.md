@@ -1,6 +1,6 @@
 ---
 name: ryan-westudio
-description: 用开源版 Ryan-WeStudio 本地编辑器整理和排版公众号文章。支持 Word 和 Markdown、内置模板、手动配图、AI 调整排版、复制和导出 HTML，不自动发布。
+description: 用开源版 Ryan-WeStudio 本地编辑器整理和排版公众号文章。支持 Word 和 Markdown、内置模板、手动或通过 AI 添加本地配图、AI 调整排版、复制和导出 HTML，不自动发布。
 ---
 
 # Ryan-WeStudio · 开源版
@@ -29,7 +29,9 @@ npm start -- --project "<项目目录>" --md "<项目目录>/structured.md" --so
 
 ## 3. 在同一个编辑页协作
 
-通过终端给出的本地 AI Tools 会话读 `snapshot`，按实际 `revision` 和 `nodeId` 提交小批操作。默认只改样式，不改内容；不要编辑活跃项目的磁盘快照或创建第二个编辑器。开源版 AI Tools 不插入或替换图片，用户可在 GUI 手动操作。换模板会保留正文和图片；后续合法编辑不用重新对照原稿。
+通过终端给出的本地 AI Tools 会话读 `snapshot`，按实际 `revision` 和 `nodeId` 提交小批操作。默认只改样式，不改内容；不要编辑活跃项目的磁盘快照或创建第二个编辑器。换模板会保留正文和图片；后续合法编辑不用重新对照原稿。
+
+用户要求添加或更换图片时，用现成的本地 PNG、JPEG、WebP 或 GIF，按[图片接口](references/ai-tools.md#ai-导入图片)上传到同一活跃会话，再按指定位置插入或替换。换图前记录目标和图片版本，完成后确认已保存。用户也可以在 GUI 手动插图和换图；开源版不附带 Pro 的选图、制图和配图规划工作流。
 
 确认已保存后，可在 Chrome 或 Edge 直接点「复制到公众号」，也可用[AI Tools](references/ai-tools.md)导出当前 HTML。由用户粘贴、检查并发布。「推送到草稿箱」只介绍 Pro，不会传送稿件。
 

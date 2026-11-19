@@ -58,8 +58,9 @@ curl -s -H "Authorization: Bearer $AI_TOKEN" "$AI_BASE/snapshot"
 | digest | text | 修改发布简介，投影到 Markdown `digest`，不改变正文 |
 | pageMargin | value:0–80整数或null | 同步调整文章左右内边距（px）；null 恢复模板默认，不写 Markdown |
 | template | templateId | 切换已注册模板，清除全部视觉覆盖、页边距微调与纯装饰 |
-| insertBlock | block:paragraph/quote/card/decoration/horizontalRule, text?, beforeId?, afterId?, focus?:boolean | 默认末尾；beforeId/afterId 互斥，在同一合法父容器内插入，不偷偷提升层级；focus 为 GUI 可选定位 |
-| convertBlock | nodeId, block:paragraph/quote/card/horizontalRule, focus? | 仅转换新建且仍为空的段落，保留块 ID；quote 为引用、card 在基础菜单中称提示块；不接受已有文字被覆盖 |
+| insertBlock | block:paragraph/quote/card/decoration/horizontalRule/image, text?, beforeId?, afterId?, assetId?, alt?, caption?, focus?:boolean | 默认末尾；beforeId/afterId 互斥，在同一合法父容器内插入；图片须使用已导入的 assetId |
+| convertBlock | nodeId, block:paragraph/quote/card/image/horizontalRule, assetId?, alt?, caption?, focus? | 只转换仍为空的普通段落，保留块 ID，不覆盖文字 |
+| replaceImage | nodeId, assetId, caption?, alt?, expectedImageVersion? | 替换目标图片；引用已导入的本地资源，过期图片版本返回 409 |
 | deleteNode | nodeId | 删除目标块，不能破坏 Schema 或表格的矩形结构 |
 | undo / redo | 无 | 必须独立一项；也可撤销 GUI 操作，GUI 可撤销 AI 操作 |
 
@@ -67,7 +68,7 @@ style 支持 `fontSize`（10–72 数值）、`color`（#RRGGBB）、`borderColo
 
 `insertBlock.text` 支持多行：CR/CRLF 统一为 LF，并表示成同一块内的 hardBreak；需要多个独立段落时提交多个 insertBlock。图片替代文字/图注中的标点、实体字面量及换行由 Markdown 序列化器转义，不会因文件名含方括号而破坏保存。
 
-开源版不允许 AI Tools 上传、插入或替换图片，即使素材已登记也是如此；混入此类操作的批次会整体拒绝。导入原稿自带配图、GUI 手动插图与换图不受影响。
+异步换图先记录目标 nodeId 和 imageVersion，等素材准备好后重新读取 revision。若目标已变或不存在，停止并核对；不能仅拿新的 revision 悄悄覆盖用户刚换的图。
 
 ### 示例
 
@@ -86,11 +87,22 @@ curl -s -H "Authorization: Bearer $AI_TOKEN" -H 'Content-Type: application/json'
 
 `POST /api/tools/save` / `POST /api/tools/export`，body `{"expectedRevision":14}`。同样路由活跃页，检查当前版本，等待原子保存。export 直接返回当前版本 `{revision,html,text}`，其中 text 为输出 HTML 的可见纯文本（不含 Markdown 定界符或 frontmatter），并写项目 `export.json`。不运行文字一致性检查，没有准备或校验状态；GUI 复制也是直接获取最新状态，不复用旧导出。不执行发布，不上传图片。
 
+## AI 导入图片
+
+在用户要求加图或换图时，向 `POST /api/tools/assets` 发送一张现成本地图片。必须使用 Bearer 令牌和 `Content-Type: application/octet-stream`，支持 PNG、JPEG、WebP、GIF（最多 25 MiB）。本地转成 PNG，GIF 取首帧；接口不收 URL、文件路径或 SVG，也不向外部服务上传。
+
+```bash
+curl --fail-with-body -sS -H "Authorization: Bearer $AI_TOKEN" \
+  -H 'Content-Type: application/octet-stream' --data-binary '@/path/to/image.png' "$AI_BASE/assets"
+```
+
+`@` 由 curl 在调用端读取文件。成功返回 `201` 和 `{id,path,mime,bytes}`，说明同一个活跃编辑页已登记并保存该资源，但正文和 revision 尚未改变。读取最新快照，以返回的 `id` 作为 `assetId` 提交 `insertBlock`（`block: "image"`）、`convertBlock`（仅空段落）或 `replaceImage`。GUI 手动上传不受影响。开源版提供的是本地图片编辑接口，不附带 Pro 的配图策划流程。
+
 ## 错误
 
-- 401：令牌无效。
-- 409：过期 revision / 没有活跃页 / 多页或磁盘版本冲突。
-- 413：请求超限。
+- 401：令牌无效，或上传图片未使用 Bearer 令牌。
+- 409：过期 revision / imageVersion / 没有活跃页 / 多页或磁盘版本冲突。
+- 413 / 415：请求超限，或请求类型/编码不受支持。
 - 422：非法操作、目标/范围/样式无效、图片无效或资源编码/导出失败。
 - 504：活跃页响应超时，结果未知，需重新读取。
 

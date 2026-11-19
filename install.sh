@@ -18,7 +18,7 @@ mkdir -p "$TARGET"; TARGET="$(cd "$TARGET" && pwd)"
 NAME="$(node -p "require('$ROOT/package.json').name")"; DEST="$TARGET/$NAME"
 case "$DEST" in "$ROOT"|"$ROOT"/*) echo '不能安装进源仓库' >&2; exit 1 ;; esac
 if [ -e "$DEST" ] && [ "$FORCE" != 1 ]; then echo "已存在 ${DEST}；需要显式 --force，不改动已有安装"; exit 1; fi
-ITEMS=(modules references scripts/editor.mjs package.json package-lock.json vite.config.mjs SKILL.md README.md install.sh)
+ITEMS=(modules references scripts/editor.mjs assets/readme package.json package-lock.json vite.config.mjs SKILL.md README.md AI_INSTALL.md install.sh)
 if [ "$DRY" = 1 ]; then printf '将复制并 npm ci/build 到 %s\n' "$DEST"; printf '  %s\n' "${ITEMS[@]}"; exit 0; fi
 STAGE="$(mktemp -d "$TARGET/.${NAME}.new.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT

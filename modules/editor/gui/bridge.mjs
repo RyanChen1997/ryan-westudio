@@ -64,6 +64,11 @@ export async function connectEditor({ onReady, onState, onStatus }) {
         session.execute(message.payload);
         const revision = session.revision;
         await flush(revision); result = session.snapshot();
+      } else if (message.method === 'syncAsset') {
+        // Share the active editor's save queue without changing the document.
+        await enqueue(session.snapshot());
+        if (!session.assets[message.payload.assetId]) throw new SessionError('图片未登记到当前项目');
+        result = { synced: true };
       } else if (message.method === 'save') result = await flush(message.payload?.expectedRevision);
       else if (message.method === 'export') result = await exportCurrent(message.payload?.expectedRevision);
       else throw new SessionError('未知工具');

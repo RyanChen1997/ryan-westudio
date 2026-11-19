@@ -4,6 +4,7 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { WebSocket } from 'ws';
+import sharp from 'sharp';
 import { createEditorServer } from '../modules/editor/tools/server.mjs';
 
 test('HTTP bridge: auth/origin/one active page, offline refusal, save CAS, no server editor replica', async t => {
@@ -36,12 +37,34 @@ test('HTTP bridge: auth/origin/one active page, offline refusal, save CAS, no se
   ws.terminate();
 });
 
+test('AI image upload requires a Bearer token, the active editor, and supported image bytes', async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'westudio-ai-assets-'));
+  const runtime = await createEditorServer({ project: directory, port: 0, markdown: '正文' });
+  t.after(async () => { await runtime.close(); await fs.rm(directory, { recursive: true, force: true }); });
+  const auth = { Authorization: `Bearer ${runtime.token}` };
+  const png = await sharp({ create: { width: 2, height: 2, channels: 3, background: '#4578ba' } }).png().toBuffer();
+  const upload = (headers = auth, body = png) => fetch(`${runtime.url}/api/tools/assets`, {
+    method: 'POST', headers: { 'Content-Type': 'application/octet-stream', ...headers }, body,
+  });
+  assert.equal((await upload({})).status, 401);
+  const cookie = `wechat_editor_${new URL(runtime.url).port}=${runtime.token}`;
+  assert.equal((await upload({ Cookie: cookie })).status, 401);
+  assert.equal((await upload()).status, 409);
+  const page = new WebSocket(runtime.url.replace('http:', 'ws:') + '/bridge', { headers: auth });
+  await new Promise(resolve => page.once('message', resolve));
+  assert.equal((await upload({ ...auth, 'Content-Type': 'application/json' }, JSON.stringify({ path: 'image.png' }))).status, 415);
+  assert.equal((await upload(auth, 'not an image')).status, 422);
+  assert.deepEqual(await fs.readdir(path.join(directory, 'assets')), []);
+  assert.equal(runtime.store.current.revision, 0);
+  page.terminate();
+});
+
 test('Pro service routes are not available to an authenticated local client', async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'westudio-open-api-'));
   const runtime = await createEditorServer({ project: directory, port: 0, markdown: '正文' });
   t.after(async () => { await runtime.close(); await fs.rm(directory, { recursive: true, force: true }); });
   const headers = { Authorization: `Bearer ${runtime.token}` };
-  for (const route of ['/api/tools/assets', '/api/tools/templates/reload', '/api/publisher/config']) {
+  for (const route of ['/api/tools/templates/reload', '/api/publisher/config']) {
     assert.equal((await fetch(runtime.url + route, { method: 'POST', headers })).status, 404, route);
   }
 });

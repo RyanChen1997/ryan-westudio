@@ -39,6 +39,27 @@ test('audit R1: image versions reject stale/ABA replacements without invalidatin
   } finally { session.destroy(); }
 });
 
+test('invalid image identifiers refuse the entire batch before dispatch', () => {
+  const session = new EditorSession(snapshot('原段落。'));
+  try {
+    session.assets = { blue: {} };
+    run(session, { type: 'insertBlock', block: 'image', assetId: 'blue' }, { type: 'insertBlock', block: 'paragraph' });
+    const before = session.snapshot();
+    const blank = before.nodes.find(node => node.type === 'paragraph' && !node.text);
+    const img = before.nodes.find(node => node.type === 'image');
+    for (const assetId of ['missing', ['blue'], 'toString']) {
+      for (const imageOp of [
+        { type: 'insertBlock', block: 'image', assetId },
+        { type: 'convertBlock', block: 'image', nodeId: blank.id, assetId },
+        { type: 'replaceImage', nodeId: img.id, assetId },
+      ]) {
+        assert.throws(() => run(session, { type: 'title', text: '不能部分提交' }, imageOp), /资源不存在/);
+        assert.deepEqual(session.snapshot(), before);
+      }
+    }
+  } finally { session.destroy(); }
+});
+
 for (const block of ['paragraph', 'card', 'quote']) test(`audit R2: ${block} multiline CR/LF input is a saveable hardBreak sequence`, async t => {
   const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'wechat-audit-lines-'));
   t.after(() => fs.rm(directory, { recursive: true, force: true }));
