@@ -16,10 +16,10 @@
 
 **直接让 AI Agent 帮你安装**
 
-把下面这段话复制给你的 AI Agent：
+把下面这段话复制给你的 AI Agent，即可安装开源版：
 
 ```text
-请帮我从这个 GitHub 仓库安装 ryan-westudio 公众号排版 Skill：
+请帮我从这个 GitHub 仓库安装 ryan-westudio 公众号排版 Skill 的开源版：
 https://github.com/RyanChen1997/ryan-westudio
 
 请先阅读仓库 README.md 末尾的「给 AI Agent 的安装指引」，并参照仓库中的 AI_INSTALL.md 将它安装到你当前环境的 Skills 目录。
@@ -91,7 +91,7 @@ https://github.com/RyanChen1997/ryan-westudio
 | 复刻其他公众号文章的排版，并加入私人模板库 | — | ✓ |
 | 确认后直接推送到公众号草稿箱 | — | ✓ |
 
-**Pro 版：99 元。一次购买，永久使用，并可持续获取后续更新。** [前往官网](https://westudio.airyanchen.cc/)
+**Pro 版：99 元。一次购买，永久使用，并可持续获取后续更新。** [购买 Pro 版](https://westudio.airyanchen.cc/)
 
 ## 特色功能
 

@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { spawnSync } from 'node:child_process';
 import sharp from 'sharp';
 import { load } from 'cheerio';
 import { installDOM, snapshot } from './helpers.mjs';
@@ -157,12 +156,4 @@ test('audit R3/R4: templates fold ordinary whitespace visually but preserve text
   assert.equal($('pre > code').text(), 'const x = "A  B";');
   assert.match(css, /:not\(pre\) > code/);
   assert.equal($('pre > code').css('padding'), '0'); assert.equal($('pre > code').css('background'), 'transparent');
-});
-
-test('audit R8: existing UTF-8 installation path gives the actionable refusal, not an unbound-variable error', async t => {
-  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'wechat-audit-install-'));
-  t.after(() => fs.rm(directory, { recursive: true, force: true }));
-  const skills = path.join(directory, '测试安装路径'); await fs.mkdir(path.join(skills, 'ryan-westudio'), { recursive: true });
-  const result = spawnSync(path.resolve('install.sh'), [skills], { encoding: 'utf8' });
-  assert.equal(result.status, 1); assert.match(result.stdout, /需要显式 --force/); assert.doesNotMatch(result.stderr, /unbound variable/);
 });

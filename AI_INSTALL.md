@@ -1,7 +1,7 @@
 # Ryan-WeStudio 开源版 — AI Agent 安装指引
 
 > 🤖 **本文档供 AI Agent 阅读与执行。**
-> 当用户要求你从 GitHub 仓库安装或更新 `ryan-westudio` 时，请按以下步骤直接完成安装，无需调用其他安装脚本。
+> 当用户要求你从 GitHub 仓库安装或更新 `ryan-westudio` 开源版时，请按以下步骤直接安装依赖并构建。
 
 ---
 
