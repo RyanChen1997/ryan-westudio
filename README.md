@@ -29,8 +29,6 @@ https://github.com/RyanChen1997/ryan-westudio
 > [!TIP]
 > **支持多种 AI Agent**：Cursor、GitHub Copilot、Antigravity、Claude Code、Codex、OpenCode、Kimi Code、Qoder、Workbuddy、豆包电脑版。
 
-**手动安装**：需要 Node.js 22.12+。克隆本仓库后，在根目录执行 `npm ci && npm run build`。运行 `npm start -- --project "<项目目录>" --md "<文章.md>" --open`，Word 输入改用 `--docx`。恢复项目时只传同一个 `--project "<项目目录>" --open`。
-
 <p align="center">
   <img src="assets/readme/templates-sideways.webp" width="1600" alt="多样模板 随心切换。公众号排版样张斜向铺叠，前景是带地图插画的生活随笔，周围是技术教程、活动通知和阅读札记等版式。">
 </p>
