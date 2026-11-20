@@ -48,7 +48,7 @@ git clone https://github.com/RyanChen1997/ryan-westudio.git "<SKILLS_DIR>/ryan-w
 
 ### 情况 B：更新已有安装（目标目录已存在）
 
-先确认它是开源版。若是 Git 仓库且无未提交改动，用 `git pull --ff-only` 更新，不强行覆盖本地改动。若不是开源版 Git 仓库，先征得用户同意并完整备份旧目录，再安装到目标位置。不要删除旧版私人模板或用户稿件，也不要把 Pro 私人模板迁进开源版运行目录。
+先确认它是开源版。运行 `node scripts/check-update.mjs` 获取 GitHub 正式 Release。在用户同意后，从 Skill 目录之外运行 `node "<Skill绝对路径>/scripts/install-update.mjs" <确认的tag>`。新版构建通过才替换，并输出完整旧目录的备份路径。若旧版没有这个脚本，下载同一个正式 tag 到临时目录，构建通过后再备份并替换。不要拉 `main`、覆盖 Pro 或删除用户稿件。
 
 ---
 
