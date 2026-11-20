@@ -5,7 +5,7 @@
 <h1 align="center">把排版交给 AI，把时间留给内容</h1>
 
 <p align="center">
-  <strong>Ryan-WeStudio · 开源版</strong> 是一个 AI 公众号排版 Skill，内置 18 套模板，帮你快速排好文章，支持后期微调。完成后可复制到公众号。
+  <strong>Ryan-WeStudio</strong> 是一个 AI 公众号排版 Skill，内置 18 套模板，帮你快速排好文章，支持后期微调。完成后可复制到公众号。
 </p>
 
 <p align="center">
@@ -16,10 +16,10 @@
 
 **直接让 AI Agent 帮你安装**
 
-把下面这段话复制给你的 AI Agent，即可安装开源版：
+把下面这段话复制给你的 AI Agent，即可安装 Ryan-WeStudio：
 
 ```text
-请帮我从这个 GitHub 仓库安装 ryan-westudio 公众号排版 Skill 的开源版：
+请帮我从这个 GitHub 仓库安装 ryan-westudio 公众号排版 Skill：
 https://github.com/RyanChen1997/ryan-westudio
 
 请先阅读仓库 README.md 末尾的「给 AI Agent 的安装指引」，并参照仓库中的 AI_INSTALL.md 将它安装到你当前环境的 Skills 目录。
@@ -68,7 +68,7 @@ https://github.com/RyanChen1997/ryan-westudio
 2. **结构整理与原文核对**：AI 自动梳理标题层级、引用、列表与段落结构，可按需拟定公众号标题与摘要，并在首次整理后逐字核对原文，确保排版过程不改字、不漏字。
 3. **匹配模板并打开编辑器**：根据文章主题智能推荐并套用合适的排版模板（Pro 也可套用已复刻的私人模板），随后在本地浏览器中启动所见即所得编辑器。
 4. **编辑器微调与 AI 协同**：你可以在同一页面直接修改正文、一键切换模板、调整页边距或增删区块，也可以继续在对话里让 AI 调整样式、插入或替换本地图片。
-5. **一键交付成稿**：排好后可直接无水印复制到公众号后台，也可[导出 HTML](references/ai-tools.md#保存与导出)。Pro 版还支持确认后推送到草稿箱（只创建草稿，不会自动群发）。开源版的「推送到草稿箱」按钮仅打开 Pro 介绍，不会传送稿件。
+5. **一键交付成稿**：排好后可直接无水印复制到公众号后台，也可[导出 HTML](references/ai-tools.md#保存与导出)。Pro 版还支持确认后推送到草稿箱（只创建草稿，不会自动群发）。本仓库提供的 Skill 中，「推送到草稿箱」按钮仅打开 Pro 介绍，不会传送稿件。
 
 ## 开源版与 Pro 版
 
@@ -117,7 +117,7 @@ https://github.com/RyanChen1997/ryan-westudio
 
 看到喜欢的公众号排版，只需把文章链接或清晰截图发给 Agent，就能高还原度地复刻出神韵一致的专属版式——无论是精巧的章牌编号、标题与底板的层次关系，还是全文的色彩搭配、字距行距与留白节奏，都能精准捕捉并沉淀到你的私人模板库中，随时套用到自己的文章上。**复刻的是版式设计与视觉美感，不搬运对方的文字与图片。**
 
-**六套公众号文章复刻对照** · 左侧是公众号原文的版式局部，右侧是套用对应模板后导出的[同一篇样稿](assets/readme/samples/clone-demo.md)。点击图片可放大查看。这里展示的是 Pro 的复刻能力，并非开源版模板清单；开源版内可选模板见[这 18 套](references/style-presets.md)。
+**六套公众号文章复刻对照** · 左侧是公众号原文的版式局部，右侧是套用对应模板后导出的[同一篇样稿](assets/readme/samples/clone-demo.md)。点击图片可放大查看。这里展示的是 Pro 的复刻能力；本仓库内置的 [18 套模板](references/style-presets.md) 可在编辑器中选用。
 
 <p align="center">
   <a href="assets/readme/clone-wechat-frost-chrysanthemum.webp"><img src="assets/readme/clone-wechat-frost-chrysanthemum.webp" width="760" alt="原文章与复刻后对照：橙色花饰章牌和正文"></a>
@@ -139,4 +139,4 @@ https://github.com/RyanChen1997/ryan-westudio
 
 ## 给 AI Agent 的安装指引
 
-> 🤖 **本节供 AI Agent 阅读**：当用户要求你安装或更新 `ryan-westudio` 时，请直接读取本仓库根目录下的 [`AI_INSTALL.md`](AI_INSTALL.md)，严格按照文档中的步骤完成环境检查、宿主 Skills 目录定位、已有安装保护、`npm ci --include=dev && npm run build` 构建及安装验证，完成后向用户汇报调用方式。日常使用请遵循开源版 [`SKILL.md`](SKILL.md)。
+> 🤖 **本节供 AI Agent 阅读**：当用户要求你安装或更新 `ryan-westudio` 时，请直接读取本仓库根目录下的 [`AI_INSTALL.md`](AI_INSTALL.md)，严格按照文档中的步骤完成环境检查、宿主 Skills 目录定位、已有安装保护、`npm ci --include=dev && npm run build` 构建及安装验证，完成后向用户汇报调用方式。日常使用请遵循本仓库的 [`SKILL.md`](SKILL.md)。
