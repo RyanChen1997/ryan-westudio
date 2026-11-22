@@ -2,6 +2,7 @@ import { getTemplate } from '../../templates/registry.mjs';
 import { arrangePanels } from './panels.mjs';
 import { codeBlockInnerStyle, decorationImageStyle, joinCSS, visualCSS } from './visual-style.mjs';
 import { cellAlignment, tableStyles } from '../core/table.mjs';
+import { IMAGE_SCALE_MAX } from '../core/image-scale.mjs';
 
 // A slot tree contains only renderer-owned elements, declared CSS, and named slots.
 // Neither the template nor user content supplies executable HTML or selects the writing path.
@@ -48,6 +49,20 @@ export function importedMarks(template) {
   return { bold: strong, italic: em, link: link ?? fallbackTokens.link, code: code ?? fallbackTokens.code };
 }
 
+function scaledImage(tree, scale) {
+  if (scale == null || scale === IMAGE_SCALE_MAX) return tree;
+  return mapTree(tree, item => {
+    if (item[0] !== 'img' || item[3].src !== '$image') return item;
+    const css = item[1];
+    const templateWidth = css.match(/(?:^|;)\s*width:\s*(\d+(?:\.\d+)?)%\s*(?:;|$)/)?.[1];
+    const width = (templateWidth ?? IMAGE_SCALE_MAX) * scale / IMAGE_SCALE_MAX;
+    const image = element(item[0], joinCSS(css, `width:${width}%;height:auto;margin-left:auto;margin-right:auto`), item[2], item[3]);
+    // For natural-size designs, measure the percentage against the intrinsic
+    // width constrained by the article and the template's original height cap.
+    return templateWidth ? image : element('section', 'width:fit-content;max-width:100%;margin-left:auto;margin-right:auto', [image]);
+  });
+}
+
 export function presentation(input, { arrange = true } = {}) {
   const template = getTemplate(input.attrs.templateId);
   const t = template.tokens;
@@ -88,8 +103,9 @@ export function presentation(input, { arrange = true } = {}) {
         ? element('section', item[1], ['$children'], { ...item[3], 'data-list-content': '' }) : item);
       inside = children.map((child, index) => plan(child, context, index === children.length - 1, null, { first: index === 0 }));
     } else if (type === 'image') {
-      // The source image has no figure. Add a neutral wrapper only for optional caption and selection.
-      tree = a.caption ? element('section', '', [role.image, element('p', joinCSS(fallbackTokens.caption, blocks.caption), ['$caption'])]) : role.image;
+      // The caption sits outside the image's scaling context.
+      const image = scaledImage(role.image, a.scale);
+      tree = a.caption ? element('section', '', [image, element('p', joinCSS(fallbackTokens.caption, blocks.caption), ['$caption'])]) : image;
     } else if (type === 'horizontalRule') tree = role.divider;
     else if (type === 'codeBlock') tree = element('pre', joinCSS(fallbackTokens.codeBlock, blocks.codeBlock), [element('code', joinCSS(codeBlockInnerStyle, blocks.codeBlockInner), ['$text'])]);
     else if (type === 'decoration') tree = element('section', 'text-align:center;margin:20px 0;', [element('img', decorationImageStyle, [], { src: 'builtin:butterfly', 'aria-hidden': 'true' })], { 'data-decorative': 'true' });

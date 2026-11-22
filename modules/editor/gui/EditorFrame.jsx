@@ -190,7 +190,7 @@ export default function EditorFrame() {
             <details className="insert-menu font-menu" ref={fontRef} onKeyDown={event => { if (event.key === 'Escape') { event.currentTarget.removeAttribute('open'); event.currentTarget.querySelector('summary').focus(); } }}>
               <summary aria-label="局部字号" title="调整选中文字或当前段落"><Type size={16} /><ChevronDown size={12} /></summary>
               <Section padding={0} className="insert-menu-content font-options">
-                {Array.from({ length: 29 }, (_, index) => index + 12).map(size => <Button key={size} label={`${size}px`} variant="ghost" size="sm"
+                {Array.from({ length: 29 }, (_, index) => index + 12).map(size => <Button key={size} label={String(size)} variant="ghost" size="sm"
                   onMouseDown={event => event.preventDefault()} onClick={() => {
                     fontRef.current.removeAttribute('open');
                     execute({ type: 'style', range: snapshot.selection.from !== snapshot.selection.to, style: { fontSize: size } });

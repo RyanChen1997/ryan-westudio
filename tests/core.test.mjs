@@ -96,7 +96,25 @@ test('store/export: save/restore exact revision, images replace and offline outp
   session.assets = store.assets;
   run(session, { type: 'insertBlock', block: 'image', assetId: imageA.id, caption: '图注中文' }, { type: 'insertBlock', block: 'decoration' });
   const imageNode = session.snapshot().nodes.find(n => n.type === 'image');
+  const resize = scale => ({ type: 'resizeImage', nodeId: imageNode.id, scale });
+  const image = () => session.snapshot().nodes.find(n => n.id === imageNode.id);
+  const beforeResize = session.snapshot();
+  for (const scale of [0, 15, 55.5, 110, '60', null, undefined]) {
+    assert.throws(() => run(session, { type: 'title', text: '不应保存' }, resize(scale)), /图片大小/);
+    assert.deepEqual(session.snapshot().doc, beforeResize.doc);
+    assert.equal(session.revision, beforeResize.revision);
+  }
+  assert.throws(() => run(session, { ...resize(50), nodeId: firstParagraph(session).id }), /目标不是图片/);
+  run(session, resize(50));
+  assert.equal(image().attrs.scale, 50);
+  assert.equal(session.markdown, beforeResize.markdown);
+  assert.equal(image().imageVersion, imageNode.imageVersion, 'resizing does not change the source image');
+  run(session, { type: 'undo' }); assert.equal(image().attrs.scale, null);
+  run(session, { type: 'redo' }); assert.equal(image().attrs.scale, 50);
+  run(session, resize(100)); assert.equal(image().attrs.scale, null);
+  run(session, { type: 'undo' }); assert.equal(image().attrs.scale, 50);
   run(session, { type: 'replaceImage', nodeId: imageNode.id, assetId: imageB.id });
+  assert.equal(image().attrs.scale, 50);
   const markdown = session.markdown;
   assert.match(markdown, new RegExp(imageB.id));
   run(session, { type: 'style', nodeId: firstParagraph(session).id, style: { fontSize: 24, color: '#234567' } });
@@ -104,9 +122,17 @@ test('store/export: save/restore exact revision, images replace and offline outp
   const restored = await new ProjectStore(directory).open();
   assert.deepEqual(restored.doc, session.snapshot().doc); assert.equal(restored.revision, session.revision); assert.equal(restored.markdown, markdown);
   await assert.rejects(store.save(session.snapshot(), 0), /冲突/);
+  const invalid = structuredClone(restored);
+  invalid.doc.content.find(n => n.type === 'image').attrs.scale = 65;
+  assert.throws(() => store.validate(invalid), /图片大小/);
+  const sized = await exportArticle(store.current, store);
+  assert.equal(inspectExportContract(store.current, sized.html).passed, true);
+  assert.match(load(sized.html)('img[alt=""]').first().attr('style'), /width:50%;height:auto;margin-left:auto;margin-right:auto/);
   for (const template of templates) {
     const baseRevision = session.revision;
     run(session, { type: 'template', templateId: template.id });
+    assert.equal(image().attrs.scale, null, 'switching template clears image sizing');
+    assert.equal(image().attrs.src, `asset:${imageB.id}`);
     await store.save(session.snapshot(), baseRevision);
     const result = await exportArticle(store.current, store);
     const contract = inspectExportContract(store.current, result.html);

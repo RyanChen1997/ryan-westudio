@@ -60,11 +60,12 @@ curl -s -H "Authorization: Bearer $AI_TOKEN" "$AI_BASE/snapshot"
 | template | templateId | 切换已注册模板，清除全部视觉覆盖、页边距微调与纯装饰 |
 | insertBlock | block:paragraph/quote/card/decoration/horizontalRule/image, text?, beforeId?, afterId?, assetId?, alt?, caption?, focus?:boolean | 默认末尾；beforeId/afterId 互斥，在同一合法父容器内插入；图片须使用已导入的 assetId |
 | convertBlock | nodeId, block:paragraph/quote/card/image/horizontalRule, assetId?, alt?, caption?, focus? | 只转换仍为空的普通段落，保留块 ID，不覆盖文字 |
-| replaceImage | nodeId, assetId, caption?, alt?, expectedImageVersion? | 替换目标图片；引用已导入的本地资源，过期图片版本返回 409 |
+| replaceImage | nodeId, assetId, caption?, alt?, expectedImageVersion? | 替换目标图片，保留当前大小；引用已导入的本地资源，过期图片版本返回 409 |
+| resizeImage | nodeId, scale | 等比缩放正文图片；`scale` 为 10、20、…、100，100 恢复模板默认大小。不改图片资源、图注或 Markdown |
 | deleteNode | nodeId | 删除目标块，不能破坏 Schema 或表格的矩形结构 |
 | undo / redo | 无 | 必须独立一项；也可撤销 GUI 操作，GUI 可撤销 AI 操作 |
 
-style 支持 `fontSize`（10–72 数值）、`color`（#RRGGBB）、`borderColor`、`borderWidth`（0–12 数值）；null 重置。range:true 只支持字号与颜色；代码等排斥视觉标记的范围会拒绝操作，不返回假成功。纯视觉不改变 Markdown。本地和迁入模板均支持这些节点/选区能力。页边距通过独立 pageMargin 操作设置；当前没有整套模板配色或全文字体参数的专用操作。
+style 支持 `fontSize`（10–72 的字号数值，界面显示如 `16`，CSS 渲染为 `16px`）、`color`（#RRGGBB）、`borderColor`、`borderWidth`（0–12 数值）；null 重置。range:true 只支持字号与颜色；代码等排斥视觉标记的范围会拒绝操作，不返回假成功。纯视觉不改变 Markdown。本地和迁入模板均支持这些节点/选区能力。页边距通过独立 pageMargin 操作设置；当前没有整套模板配色或全文字体参数的专用操作。
 
 `insertBlock.text` 支持多行：CR/CRLF 统一为 LF，并表示成同一块内的 hardBreak；需要多个独立段落时提交多个 insertBlock。图片替代文字/图注中的标点、实体字面量及换行由 Markdown 序列化器转义，不会因文件名含方括号而破坏保存。
 

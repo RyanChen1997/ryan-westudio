@@ -67,7 +67,8 @@ try {
   assert.ok(current.doc.content.some(n => n.content?.some(t => t.text?.includes('GUI文字探针') && t.marks?.some(m => m.type === 'bold'))));
   const markdownBeforeLocalSize = current.markdown;
   await page.getByLabel('局部字号', { exact: true }).click();
-  await click('20px');
+  assert.equal(await page.getByRole('button', { name: '20px', exact: true }).count(), 0);
+  await click('20');
   current = await snapshot();
   assert.equal(current.markdown, markdownBeforeLocalSize);
   assert.ok(current.doc.content.some(n => n.content?.some(t => t.text?.includes('GUI文字探针') && t.marks?.some(m => m.type === 'visual' && m.attrs.fontSize === 20))));

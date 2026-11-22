@@ -12,7 +12,13 @@ export function ArticleOutline({ api, snapshot, night }) {
   const trigger = useRef(null), host = useRef(null), suppressHover = useRef(false);
   const current = useRef({ api, headings, night }); current.current = { api, headings, night };
   function headingDOM(item, index) {
-    return current.current.night ? document.querySelector('.night-reading')?.shadowRoot?.querySelectorAll('h1,h2,h3,h4,[role="heading"]')[index] : current.current.api.session.editor.view.nodeDOM(item.position);
+    if (current.current.night) return document.querySelector('.night-reading')?.shadowRoot?.querySelectorAll('h1,h2,h3,h4,[role="heading"]')[index];
+    const { view } = current.current.api.session.editor;
+    const dom = view.nodeDOM(item.position);
+    // A frame can run between a Tiptap transaction and React's next snapshot.
+    // The old position may now point to a text node or to a different block.
+    return dom instanceof HTMLElement && dom.dataset.nodeId === item.id
+      ? dom : view.dom.querySelector(`[data-node-id="${CSS.escape(item.id)}"]`);
   }
   useEffect(() => {
     let frame = 0;

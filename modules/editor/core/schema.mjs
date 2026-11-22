@@ -4,6 +4,7 @@ import { Plugin } from '@tiptap/pm/state';
 import { DesignPanel, TemplateLayout, importedNodeView } from './template-layout.mjs';
 import { tableExtensions, tableNames } from './table.mjs';
 import { DEFAULT_TEMPLATE_ID } from '../../templates/registry.mjs';
+import { validateImageScale } from './image-scale.mjs';
 import { visualCSS, decorationImageStyle } from '../render/visual-style.mjs';
 export { visualCSS } from '../render/visual-style.mjs';
 export const blockTypes = ['paragraph', 'heading', 'blockquote', 'bulletList', 'orderedList', 'listItem', 'codeBlock', 'horizontalRule', 'image', 'card', 'decoration', ...tableNames];
@@ -63,7 +64,10 @@ const ArticleDocument = Node.create({
 });
 const ArticleImage = Node.create({
   name: 'image', group: 'block', atom: true, draggable: true,
-  addAttributes: () => ({ src: { default: '' }, alt: { default: '' }, caption: { default: '' } }),
+  addAttributes: () => ({
+    src: { default: '' }, alt: { default: '' }, caption: { default: '' },
+    scale: { default: null, rendered: false, validate: value => { if (value !== null) validateImageScale(value); } },
+  }),
   parseHTML: () => [{ tag: 'figure[data-article-image]' }],
   renderHTML({ HTMLAttributes }) {
     const { src, alt, caption, ...rest } = HTMLAttributes;

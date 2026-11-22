@@ -3,11 +3,19 @@ import { createPortal } from 'react-dom';
 import { Popover } from '@astryxdesign/core/Popover';
 import { Button } from '@astryxdesign/core/Button';
 import { Section } from '@astryxdesign/core/Section';
+import { Slider } from '@astryxdesign/core/Slider';
 import { Text } from '@astryxdesign/core/Text';
-import { ArrowDown, ArrowUp, Check, GripVertical, ImagePlus, Info, Minus, Pilcrow, Quote, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, GripVertical, ImagePlus, Info, Minus, Pilcrow, Quote, Scaling, Trash2 } from 'lucide-react';
+import { IMAGE_SCALE_MIN, IMAGE_SCALE_MAX, IMAGE_SCALE_STEP } from '../core/image-scale.mjs';
 import { articleViewportTop } from './appearance.mjs';
 
 const HANDLE_SIZE = 28;
+const RESIZE_LABEL = '调整图片大小';
+const scaleLabel = value => `${value}%`;
+const SCALE_MARKS = Array.from({ length: (IMAGE_SCALE_MAX - IMAGE_SCALE_MIN) / IMAGE_SCALE_STEP + 1 }, (_, i) => {
+  const value = IMAGE_SCALE_MIN + i * IMAGE_SCALE_STEP;
+  return { value, label: [IMAGE_SCALE_MIN, IMAGE_SCALE_MAX].includes(value) ? scaleLabel(value) : undefined };
+});
 const isRule = el => el.matches('hr,[data-article-node="horizontalRule"]');
 const STYLES = [
   ['paragraph', '普通段落', Pilcrow], ['quote', '引用块', Quote],
@@ -29,6 +37,7 @@ function blockAt(editor, target, x, y) {
   const root = editor.view.dom;
   if (!(target instanceof Element) || !root.contains(target)) return null;
   let block = target.closest('[data-node-id]');
+  if (block?.matches('[data-article-node="image"]')) return block;
   const list = block?.closest('li,[data-article-node="listItem"]')?.closest('ul[data-node-id],ol[data-node-id],[data-article-node="bulletList"],[data-article-node="orderedList"]');
   if (list) block = list;
   if (block?.closest('table[data-node-id]')) block = block.closest('table[data-node-id]');
@@ -53,6 +62,13 @@ function navigateMenu(event, menu = event.currentTarget) {
   const at = Math.max(0, items.indexOf(document.activeElement));
   const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (at + (event.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
   items[next].focus({ preventScroll: true });
+}
+
+function ImageSizeControl({ scale, onResize }) {
+  const [draft, setDraft] = useState(null);
+  return <Slider label={RESIZE_LABEL} isLabelHidden min={IMAGE_SCALE_MIN} max={IMAGE_SCALE_MAX} step={IMAGE_SCALE_STEP}
+    marks={SCALE_MARKS} formatValue={scaleLabel} valueDisplay="text" value={draft ?? scale ?? IMAGE_SCALE_MAX}
+    onChange={setDraft} onChangeEnd={value => { setDraft(null); onResize(value); }} />;
 }
 
 export function BlockControls({ api, snapshot, disabled, onError }) {
@@ -127,8 +143,8 @@ export function BlockControls({ api, snapshot, disabled, onError }) {
     let frame, cancelled = false, attempts = 0;
     const focusReady = () => {
       if (cancelled || phaseRef.current !== phase) return;
-      if (menu.current?.contains(document.activeElement) && document.activeElement.getAttribute('role') === 'menuitem') return;
-      const first = menuItems(menu.current)[0];
+      const first = phase === 'resize' ? menu.current?.querySelector('[role="slider"]') : menuItems(menu.current)[0];
+      if (menu.current?.contains(document.activeElement) && document.activeElement.getAttribute('role') === (phase === 'resize' ? 'slider' : 'menuitem')) return;
       if (first?.getBoundingClientRect().width > 0 && getComputedStyle(first).visibility !== 'hidden') {
         first.focus({ preventScroll: true });
         if (document.activeElement === first) return;
@@ -200,11 +216,19 @@ export function BlockControls({ api, snapshot, disabled, onError }) {
   }, [snapshot.revision]);
   useEffect(() => () => { uploadEpoch.current++; }, []);
   if (disabled || !target) return null;
-  const content = <Section ref={menu} padding={0} className="block-ui" data-block-ui data-block-menu={phase} role="menu" aria-label={phase === 'styles' ? '新增区块样式' : '块操作'}
-    onMouseDown={event => event.preventDefault()} onKeyDown={event => {
-      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(true); } else navigateMenu(event);
+  const node = snapshot.nodes.find(item => item.id === target.id);
+  const label = phase === 'resize' ? RESIZE_LABEL : phase === 'styles' ? '新增区块样式' : '块操作';
+  const content = <Section ref={menu} padding={0} className="block-ui" data-block-ui data-block-menu={phase}
+    role={phase === 'resize' ? 'group' : 'menu'} aria-label={label}
+    onMouseDown={phase === 'resize' ? undefined : event => event.preventDefault()} onKeyDown={event => {
+      if (phase !== 'resize') navigateMenu(event);
     }}>
-    {phase === 'styles' ? <>
+    {phase === 'resize' && node?.type === 'image' ?
+      <ImageSizeControl key={node.id} scale={node.attrs.scale} onResize={scale => {
+        if (phaseRef.current !== 'resize' || targetRef.current?.id !== node.id) return;
+        try { run({ type: 'resizeImage', nodeId: node.id, scale }); }
+        catch (error) { live.current.onError(error.message); }
+      }} /> : phase === 'styles' ? <>
       <Text className="block-menu-caption">选择区块样式</Text>
       {STYLES.map(([block, label, Icon]) => <Button key={block} label={label} role="menuitem" variant="ghost" className={`block-menu-item${block === 'paragraph' ? ' is-default' : ''}`}
         isDisabled={uploading} icon={<Icon size={16} />} onClick={() => choose(block)}>
@@ -215,8 +239,10 @@ export function BlockControls({ api, snapshot, disabled, onError }) {
       <Button label="删除此块" role="menuitem" variant="ghost" className="block-menu-item block-menu-delete" icon={<Trash2 size={15} />} onClick={() => {
         try { run({ type: 'deleteNode', nodeId: targetRef.current.id }); close(); targetRef.current = null; setTarget(null); } catch (error) { live.current.onError(error.message); }
       }}><Text className="block-menu-label">删除此块</Text></Button>
-      <Button label="在下方插入块" role="menuitem" variant="ghost" className="block-menu-item" icon={<ArrowDown size={15} />} onClick={() => insert('after')}><Text className="block-menu-label">在下方插入块</Text></Button>
       <Button label="在上方插入块" role="menuitem" variant="ghost" className="block-menu-item" icon={<ArrowUp size={15} />} onClick={() => insert('before')}><Text className="block-menu-label">在上方插入块</Text></Button>
+      <Button label="在下方插入块" role="menuitem" variant="ghost" className="block-menu-item" icon={<ArrowDown size={15} />} onClick={() => insert('after')}><Text className="block-menu-label">在下方插入块</Text></Button>
+      {node?.type === 'image' && <Button label={RESIZE_LABEL} role="menuitem" variant="ghost" className="block-menu-item" icon={<Scaling size={15} />}
+        onClick={() => changePhase('resize')}><Text className="block-menu-label">{RESIZE_LABEL}</Text></Button>}
     </>}
   </Section>;
   return <>
@@ -227,7 +253,7 @@ export function BlockControls({ api, snapshot, disabled, onError }) {
         onMouseDown={event => { keyboardMode.current = false; event.preventDefault(); }} onKeyDown={event => { if (['Enter', ' '].includes(event.key)) keyboardMode.current = true; }}><GripVertical size={17} /></button>
     </>, document.body)}
     <Popover anchorRef={handle} isOpen={!!phase} onOpenChange={open => { if (!open) close(); else if (!phaseRef.current) changePhase('actions'); }}
-      placement="end" alignment="start" width={216} padding={2} role="none" label={phase === 'styles' ? '新增区块样式' : '块操作'} hasCloseButton={false}
+      placement="end" alignment="start" width={phase === 'resize' ? 252 : 216} padding={2} role="none" label={label} hasCloseButton={false}
       hasAutoFocus={false} hasEscapeDismiss={false} presentation="popover" content={content} />
     <input ref={fileInput} type="file" className="editor-hidden" aria-label="插入块图片" accept="image/png,image/jpeg,image/webp,image/gif" onChange={upload} onCancel={() => close(true)} />
   </>;

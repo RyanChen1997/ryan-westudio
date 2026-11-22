@@ -2,6 +2,7 @@ import { Editor } from '@tiptap/core';
 import { TextSelection, NodeSelection } from '@tiptap/pm/state';
 import { closeHistory } from '@tiptap/pm/history';
 import { extensions, assignIds, validateStyle, validatePageMargin, visualKeys } from './schema.mjs';
+import { IMAGE_SCALE_MAX, validateImageScale } from './image-scale.mjs';
 import { toMarkdown } from './markdown.mjs';
 import { getTemplate } from '../../templates/registry.mjs';
 import { arrangePanels } from '../render/panels.mjs';
@@ -187,12 +188,23 @@ export class EditorSession {
             const decorations = [];
             tr.doc.descendants((node, pos) => {
               if (node.type.name === 'decoration') decorations.push({ pos, size: node.nodeSize });
-              else if (node.attrs.id) tr.setNodeMarkup(pos, undefined, { ...node.attrs, ...Object.fromEntries(visualKeys.map(k => [k, null])) });
+              else if (node.attrs.id) tr.setNodeMarkup(pos, undefined, {
+                ...node.attrs, ...Object.fromEntries(visualKeys.map(k => [k, null])),
+                ...(node.type.name === 'image' && { scale: null }),
+              });
             });
             decorations.reverse().forEach(t => tr.delete(t.pos, t.pos + t.size));
             tr.removeMark(0, tr.doc.content.size, this.editor.schema.marks.visual);
             tr.setDocAttribute('templateId', op.templateId);
             tr.setDocAttribute('pageMargin', null); break;
+          }
+          case 'resizeImage': {
+            const t = locate(tr.doc, op.nodeId);
+            if (t.node.type.name !== 'image') throw new SessionError('目标不是图片');
+            validateImageScale(op.scale);
+            const scale = op.scale === IMAGE_SCALE_MAX ? null : op.scale;
+            if (t.node.attrs.scale !== scale) tr.setNodeMarkup(t.pos, undefined, { ...t.node.attrs, scale });
+            break;
           }
           case 'replaceImage': {
             const t = locate(tr.doc, op.nodeId);

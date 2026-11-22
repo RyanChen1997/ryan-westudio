@@ -135,6 +135,7 @@ body {overflow:hidden;-webkit-font-smoothing:antialiased;}
 .block-handle:focus-visible,.article-outline button:focus-visible {outline:2px solid var(--focus);outline-offset:2px;}
 .astryx-popover:has([data-block-menu]) {border:1px solid var(--border);border-radius:16px;background:var(--surface);box-shadow:0 6px 24px #30364f18;color:var(--fg);}
 .block-ui {font:13px/1.5 var(--font-body);color:var(--fg-2);}
+.block-ui[data-block-menu="resize"] {padding:var(--space-3);padding-block-end:var(--space-5);}
 .block-ui .astryx-section {display:contents;}
 .block-ui .astryx-button,.studio .block-ui .astryx-button {display:flex;justify-content:flex-start;width:100%;height:34px;min-height:34px;padding:6px 9px;border:1px solid transparent;border-radius:7px;background:transparent;color:var(--fg-2);box-shadow:none;font:400 13px/1.5 var(--font-body);gap:8px;}
 .block-ui .astryx-button:hover:not([aria-disabled="true"]),.block-ui .is-default {background:var(--soft);color:var(--accent);}
