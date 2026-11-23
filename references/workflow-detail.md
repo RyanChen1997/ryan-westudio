@@ -24,7 +24,7 @@ AI 完整读取 source.md，另写 structured.md，只改明确的层级和格�
 如果用户指定[内置模板](style-presets.md)，用 `--preset` 明确套用；否则推荐并使用合适的现有模板，不另设选模板等待环节。
 
 ```sh
-npm start -- --project "<项目目录>" --md "<项目目录>/structured.md" --source-md "<项目目录>/source.md" --open
+npm start -- --project "<项目目录>" --md "<项目目录>/structured.md" --source-md "<项目目录>/source.md" --ai-layout-lock --open
 # 指定模板：--preset blue-sequence
 # 补图片搜索目录：--asset-dir /absolute/images
 # 端口冲突：--port 4319
@@ -34,11 +34,11 @@ npm start -- --project "<项目目录>" --md "<项目目录>/structured.md" --so
 
 程序检查原文基准哈希、结构稿文字、原标题是否保留与正文顺序，不判断正文标题层级是否合理。失败提供差异，AI 修复 structured.md 后重跑，不改 source.md、不让用户关掉校验。
 
-通过后才创建初始编辑状态并启动服务。所用模板可在同页切换；不增加画廊等待或人工校验按钮。直接导入未经过 AI 的 Markdown/Word 也可以，但没有独立原文基准时不声称已完成 AI 前后对照。
+通过后才创建初始编辑状态并启动服务。页面打开即锁定，稿件已保存后[释放排版锁](ai-tools.md#ai-排版锁)再交付，不逐屏截图。解锁后所用模板可在同页切换。手动导入或恢复不加 `--ai-layout-lock`；没有独立原文基准时不声称已完成 AI 前后对照。
 
 ## 3. 所见即所得编辑与协作
 
-用户直接编辑当前正文。AI 从同一个活跃页读 snapshot，以 revision + nodeId 提交操作，见 ai-tools.md。默认美化不改字；用户授权后才改内容。
+没有 AI 任务时用户直接编辑。后续 AI 修改先锁定，再从同一活跃页读 snapshot，以 revision + nodeId 提交操作；跨批次保持锁定，保存后统一释放。默认美化不改字；用户授权后才改内容。
 
 换用内置模板时在同一编辑页操作，不重新导入或启动第二个编辑器。可在 GUI 手动加图和换图；用户要求 AI 添加或替换本地图片时，按 [AI 图片接口](ai-tools.md#ai-导入图片)在同一活跃页操作。
 

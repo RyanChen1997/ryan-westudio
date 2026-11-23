@@ -1,4 +1,5 @@
 import { test } from 'node:test';
+import { once } from 'node:events';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -67,6 +68,56 @@ test('Pro service routes are not available to an authenticated local client', as
   for (const route of ['/api/tools/templates/reload', '/api/publisher/config']) {
     assert.equal((await fetch(runtime.url + route, { method: 'POST', headers })).status, 404, route);
   }
+});
+
+test('layout lock: authenticated owner, output rejection, expiry and no saved lock state', { timeout: 8000 }, async t => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'wechat-layout-lock-'));
+  const runtime = await createEditorServer({ project: directory, port: 0, markdown: '正文', layoutLockMs: 1000 });
+  t.after(async () => { await runtime.close(); await fs.rm(directory, { recursive: true, force: true }); });
+  const auth = { Authorization: `Bearer ${runtime.token}` };
+  const cookie = { Cookie: `wechat_editor_${new URL(runtime.url).port}=${runtime.token}` };
+  const lockRequest = (method, lockId, credentials = auth) => fetch(`${runtime.url}/api/tools/layout-lock`, {
+    method, headers: { ...credentials, ...(lockId ? { 'X-AI-Layout-Lock': lockId } : {}) },
+  });
+  assert.equal((await lockRequest('POST', undefined, {})).status, 401);
+  assert.equal((await lockRequest('POST', undefined, cookie)).status, 401);
+  const page = new WebSocket(runtime.url.replace('http:', 'ws:') + '/bridge', { headers: cookie });
+  const nextMessage = async () => JSON.parse((await once(page, 'message', { signal: AbortSignal.timeout(6000) }))[0]);
+  const { lease, layoutLocked } = await nextMessage();
+  assert.equal(layoutLocked, false);
+  const lockedEvent = nextMessage();
+  const start = await lockRequest('POST');
+  assert.equal(start.status, 201);
+  const { lockId, expiresAt } = await start.json();
+  assert.deepEqual(await lockedEvent, { method: 'layoutLock', locked: true });
+  assert.equal((await lockRequest('POST')).status, 423);
+  const headers = { ...cookie, 'X-Editor-Lease': lease, 'Content-Type': 'application/json' };
+  const rejected = await fetch(`${runtime.url}/api/export`, { method: 'POST', headers, body: '{"expectedRevision":0}' });
+  assert.equal(rejected.status, 423);
+  assert.equal((await rejected.json()).code, 'AI_LAYOUT_LOCKED');
+  assert.equal((await lockRequest('DELETE', 'another-task')).status, 409);
+  const expiredEvent = nextMessage();
+  const renew = await lockRequest('PUT', lockId);
+  assert.equal(renew.status, 200);
+  const renewed = await renew.json();
+  assert.equal(renewed.lockId, lockId);
+  assert.ok(renewed.expiresAt >= expiresAt);
+  assert.deepEqual(await expiredEvent, { method: 'layoutLock', locked: false });
+  assert.equal((await lockRequest('PUT', lockId)).status, 409);
+  const newLock = await (await lockRequest('POST')).json();
+  assert.notEqual(newLock.lockId, lockId);
+  assert.equal((await lockRequest('DELETE', lockId)).status, 409);
+  assert.equal((await lockRequest('DELETE', newLock.lockId)).status, 204);
+  const staleWrite = await fetch(`${runtime.url}/api/tools/operations`, {
+    method: 'POST', headers: { ...auth, 'Content-Type': 'application/json', 'X-AI-Layout-Lock': lockId },
+    body: JSON.stringify({ expectedRevision: 0, operations: [{ type: 'title', text: '过期写入' }] }),
+  });
+  assert.equal(staleWrite.status, 409);
+  assert.equal((await staleWrite.json()).code, 'AI_LAYOUT_LOCK_STALE');
+  const saved = JSON.parse(await fs.readFile(path.join(directory, 'project.json'), 'utf8'));
+  assert.equal(saved.revision, 0);
+  assert.equal(Object.hasOwn(saved, 'layoutLocked'), false);
+  page.terminate();
 });
 
 test('HTTP auth: projects on different ports retain independent browser cookies', async t => {

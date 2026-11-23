@@ -13,10 +13,10 @@ const benefits = [
   ['享受永久更新'],
 ];
 
-export function ProPromotionTab({ onClick }) {
+export function ProPromotionTab({ onClick, disabled }) {
   return <aside className="pro-dock" aria-label="Pro 版介绍">
     <Button label="WeStudio Pro · 查看更多功能" variant="secondary" className="pro-dock-button"
-      icon={<Sparkles size={14} aria-hidden="true" />} aria-haspopup="dialog" onClick={onClick}>
+      icon={<Sparkles size={14} aria-hidden="true" />} aria-haspopup="dialog" isDisabled={disabled} onClick={onClick}>
       <Text as="span" className="pro-dock-title">WeStudio Pro · 查看更多功能 <ChevronUp size={14} aria-hidden="true" /></Text>
     </Button>
   </aside>;

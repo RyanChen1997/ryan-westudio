@@ -36,6 +36,25 @@ test('markdown: semantic roundtrip title, Chinese, nested lists, code, captions 
   assert.deepEqual(semantics(again), semantics(doc));
   assert.equal(toMarkdown(again), toMarkdown(doc));
 });
+test('session: layout lock filters native transactions but allows authenticated AI execution', t => {
+  const session = new EditorSession(snapshot(), { layoutLocked: true });
+  t.after(() => session.destroy());
+  const initial = session.snapshot(), node = firstParagraph(session);
+  session.editor.view.dispatch(session.editor.state.tr.insertText('禁止原生写入', node.position + 1));
+  assert.equal(session.revision, initial.revision);
+  assert.throws(() => run(session, { type: 'template', templateId: TECH_TEMPLATE_ID }), /AI 正在排版/);
+  session.executeFromAI({ expectedRevision: initial.revision, operations: [{ type: 'template', templateId: TECH_TEMPLATE_ID }] });
+  assert.equal(session.snapshot().doc.attrs.templateId, TECH_TEMPLATE_ID);
+  assert.equal(session.editor.isEditable, false);
+  assert.equal(session.markdown, initial.markdown);
+  session.setLayoutLocked(false);
+  run(session, { type: 'undo' });
+  assert.deepEqual(session.snapshot().doc, initial.doc);
+  assert.equal(session.editor.isEditable, true);
+  session.disconnect();
+  assert.throws(() => session.executeFromAI({ expectedRevision: session.revision, operations: [{ type: 'title', text: '断开后不可写入' }] }), /连接已断开/);
+});
+
 test('session: visual styles do not alter Markdown, template resets visual not semantics, undo restores', () => {
   const session = new EditorSession(snapshot());
   const id = firstParagraph(session).id, original = session.markdown;

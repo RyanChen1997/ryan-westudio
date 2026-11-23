@@ -11,10 +11,10 @@ const { values } = parseArgs({ options: {
   project: { type: 'string' }, md: { type: 'string' }, docx: { type: 'string' },
   'source-md': { type: 'string' }, 'prepare-only': { type: 'boolean' },
   preset: { type: 'string' }, port: { type: 'string', default: '4318' },
-  'asset-dir': { type: 'string', multiple: true }, open: { type: 'boolean' }, help: { type: 'boolean' },
+  'asset-dir': { type: 'string', multiple: true }, open: { type: 'boolean' }, help: { type: 'boolean' }, 'ai-layout-lock': { type: 'boolean' },
 } });
 if (values.help || !values.project) {
-  console.log('用法: npm start -- --project <持久项目目录> [--md <文章.md> | --docx <文章.docx>] [--source-md <原文快照.md>] [--prepare-only] [--preset <模板>] [--asset-dir <目录>] [--port 4318] [--open]\nAI 整理前：--prepare-only 冻结原文；整理后：--md structured.md --source-md source.md，文字对照通过才启动。已有项目直接 --project 恢复，不重新校验用户编辑。');
+  console.log('用法: npm start -- --project <持久项目目录> [--md <文章.md> | --docx <文章.docx>] [--source-md <原文快照.md>] [--prepare-only] [--preset <模板>] [--asset-dir <目录>] [--port 4318] [--open] [--ai-layout-lock]\nAI 整理前：--prepare-only 冻结原文；整理后：--md structured.md --source-md source.md，文字对照通过才启动。已有项目直接 --project 恢复，不重新校验用户编辑。');
   process.exit(values.help ? 0 : 1);
 }
 
@@ -71,9 +71,11 @@ async function main() {
       assetDirs.push(...manifest.assetDirs);
     }
   }
-  const runtime = await createEditorServer({ project, port: Number(values.port), markdown, source, sourceMarkdown, templateId: values.preset, assetDirs });
+  const runtime = await createEditorServer({ project, port: Number(values.port), markdown, source, sourceMarkdown, templateId: values.preset, assetDirs,
+    startLayoutLocked: values['ai-layout-lock'] });
   if (!exists) console.log(runtime.store.current.sourceValidation ? '原文文字一致性：通过（仅首次结构化阶段，后续编辑不重跑）' : '直接导入：未提供独立原文基准，不声称已验证 AI 结构化前后的一致性');
-  console.log(`编辑器 PID: ${process.pid}\n项目: ${runtime.store.directory}\nURL: ${runtime.url}/#token=${runtime.token}\nAI_TOKEN=${runtime.token}\nAI_BASE=${runtime.url}/api/tools\n仅监听本机；令牌只授予可信的本机 AI。Ctrl+C 停止。`);
+  const layoutInfo = runtime.initialLayoutLock ? `AI_LAYOUT_LOCK_ID=${runtime.initialLayoutLock.lockId}\n编辑器已锁定；AI 排版结束后请释放排版锁。\n` : '';
+  console.log(`编辑器 PID: ${process.pid}\n项目: ${runtime.store.directory}\nURL: ${runtime.url}/#token=${runtime.token}\nAI_TOKEN=${runtime.token}\n${layoutInfo}AI_BASE=${runtime.url}/api/tools\n仅监听本机；令牌只授予可信的本机 AI。Ctrl+C 停止。`);
   if (values.open) {
     const command = process.platform === 'darwin' ? 'open' : process.platform === 'win32' ? 'cmd' : 'xdg-open';
     spawn(command, process.platform === 'win32' ? ['/c', 'start', '', `${runtime.url}/#token=${runtime.token}`] : [`${runtime.url}/#token=${runtime.token}`], { stdio: 'ignore' }).on('error', error => console.error('请手动打开 URL:', error.message));

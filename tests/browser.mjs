@@ -14,7 +14,8 @@ await fs.mkdir(evidence, { recursive: true });
 let runtime, browser;
 try {
   const sourceMarkdown = await fs.readFile('fixtures/editor-smoke.md', 'utf8');
-  runtime = await createEditorServer({ project, port: 0, markdown: sourceMarkdown, sourceMarkdown, templateId: DEFAULT_TEMPLATE_ID });
+  runtime = await createEditorServer({ project, port: 0, markdown: sourceMarkdown, sourceMarkdown, templateId: DEFAULT_TEMPLATE_ID,
+    startLayoutLocked: true });
   const changedMargin = getTemplate(DEFAULT_TEMPLATE_ID).layout.pageMargin + 1;
   const chrome = process.env.CHROME_PATH || (await fs.stat('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome').then(() => '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', () => undefined));
   browser = await chromium.launch({ headless: true, ...(chrome ? { executablePath: chrome } : {}) });
@@ -31,16 +32,57 @@ try {
     Object.defineProperty(navigator, 'clipboard', { value: { write: async items => { window.__clipboardHTML = await (await items[0].getType('text/html')).text(); } } });
   });
   const auth = { Authorization: `Bearer ${runtime.token}`, 'Content-Type': 'application/json' };
-  const request = async (route, body) => {
-    const res = await fetch(`${runtime.url}/api/tools/${route}`, { headers: auth, ...(body !== undefined ? { method: 'POST', body: JSON.stringify(body) } : {}) });
-    return { status: res.status, data: await res.json() };
+  const request = async (route, body, { method = body === undefined ? 'GET' : 'POST', lockId } = {}) => {
+    const headers = { ...auth, ...(lockId ? { 'X-AI-Layout-Lock': lockId } : {}) };
+    const res = await fetch(`${runtime.url}/api/tools/${route}`, { headers, method, body: JSON.stringify(body) });
+    return { status: res.status, data: res.status === 204 ? null : await res.json() };
   };
   const snapshot = async () => { const res = await request('snapshot'); assert.equal(res.status, 200); return res.data; };
   const op = async (...operations) => { const current = await snapshot(); const res = await request('operations', { expectedRevision: current.revision, operations }); assert.equal(res.status, 200, JSON.stringify(res.data)); return res.data; };
   const click = name => page.getByRole('button', { name, exact: true }).click();
   await page.goto(`${runtime.url}/#token=${runtime.token}`);
-  await page.locator('.tiptap').waitFor();
+  const body = page.locator('.tiptap');
+  const waitForEditability = editable => page.locator(`.tiptap[contenteditable="${editable}"]`).waitFor();
+  const lockNotice = page.getByText('AI 正在排版，暂时不能编辑或复制。', { exact: true });
+  const disabled = name => page.getByRole('button', { name, exact: true }).isDisabled();
+  const releaseLayoutLock = async lockId => {
+    assert.equal((await request('layout-lock', undefined, { method: 'DELETE', lockId })).status, 204);
+    await waitForEditability(true);
+    await lockNotice.waitFor({ state: 'hidden' });
+  };
+  await waitForEditability(false);
   const initialView = await snapshot();
+  assert.equal(initialView.layoutLocked, true);
+  assert.equal(await body.getAttribute('aria-readonly'), 'true');
+  await body.locator('p').first().hover();
+  await lockNotice.waitFor();
+  assert.equal(await body.evaluate(el => getComputedStyle(el.closest('.editor-body')).cursor), 'not-allowed');
+  await page.setViewportSize({ width: 390, height: 844 });
+  assert.equal(await lockNotice.isVisible(), true, 'touch layout must not depend on hover to show the lock');
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  assert.equal(await page.getByLabel('文章标题', { exact: true }).isDisabled(), true);
+  for (const label of ['复制到公众号', '推送到草稿箱', '加粗', '保存项目', 'WeStudio Pro · 查看更多功能', getTemplate(TECH_TEMPLATE_ID).name]) assert.equal(await disabled(label), true, label);
+  await body.locator('p').first().click();
+  await page.keyboard.insertText('锁定时不可写');
+  assert.equal((await snapshot()).revision, initialView.revision);
+  assert.doesNotMatch((await snapshot()).markdown, /锁定时不可写/);
+  const blockedExport = await request('export', { expectedRevision: initialView.revision });
+  assert.equal(blockedExport.data.code, 'AI_LAYOUT_LOCKED');
+  const initialLockId = runtime.initialLayoutLock.lockId;
+  const aiParagraph = initialView.nodes.find(n => n.type === 'paragraph');
+  const lockedWrite = await request('operations', { expectedRevision: initialView.revision,
+    operations: [{ type: 'style', nodeId: aiParagraph.id, style: { color: '#005fc7' } }] }, { lockId: initialLockId });
+  assert.equal(lockedWrite.status, 200, JSON.stringify(lockedWrite.data));
+  const styledWhileLocked = body.locator(`[data-node-id="${aiParagraph.id}"]`);
+  await page.waitForFunction(id => document.querySelector(`.tiptap [data-node-id="${id}"]`)?.style.color === 'rgb(0, 95, 199)', aiParagraph.id);
+  await page.reload();
+  await waitForEditability(false);
+  assert.equal((await snapshot()).revision, lockedWrite.data.revision);
+  assert.equal(await styledWhileLocked.evaluate(el => el.style.color), 'rgb(0, 95, 199)');
+  await releaseLayoutLock(initialLockId);
+  assert.equal((await snapshot()).revision, lockedWrite.data.revision);
+  assert.equal(await page.getByLabel('文章标题', { exact: true }).isEnabled(), true);
   assert.equal(initialView.sourceValidation?.stage, 'initial-structuring');
   assert.equal(initialView.sourceValidation.passed, true);
   assert.equal(await page.getByRole('button', { name: '校验并准备复制', exact: true }).count(), 0);
@@ -52,7 +94,7 @@ try {
   await click('夜间模式'); await page.getByLabel('夜间阅读显示').waitFor();
   assert.equal(await page.locator('.studio').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(248, 250, 255)');
   await click('白天模式'); await click('电脑版');
-  assert.equal((await snapshot()).revision, initialView.revision, 'display choices must not edit the document');
+  assert.equal((await snapshot()).revision, lockedWrite.data.revision, 'display choices must not edit the document');
   await page.getByLabel('文章标题', { exact: true }).fill('界面核验标题');
   assert.equal((await snapshot()).doc.attrs.title, '界面核验标题');
   // Real keyboard input probe on the document, not a title/hidden textarea.
@@ -83,6 +125,21 @@ try {
   assert.equal(await page.locator('.tiptap').evaluate(el => getComputedStyle(el).paddingLeft), `${changedMargin}px`);
   await click('撤销'); assert.equal((await snapshot()).doc.attrs.pageMargin, null);
   await click('重做'); assert.equal((await snapshot()).doc.attrs.pageMargin, changedMargin);
+  await click('推送到草稿箱');
+  const draftDialog = page.getByRole('dialog');
+  await draftDialog.getByRole('button', { name: '继续编辑', exact: true }).waitFor();
+  const laterLock = await request('layout-lock', undefined, { method: 'POST' });
+  assert.equal(laterLock.status, 201);
+  await waitForEditability(false);
+  await draftDialog.waitFor({ state: 'hidden' });
+  assert.equal(await disabled('页边距增大'), true);
+  assert.equal(await disabled('撤销'), true);
+  const lockedAgain = await snapshot();
+  assert.equal((await request('operations', { expectedRevision: lockedAgain.revision, operations: [{ type: 'pageMargin', value: changedMargin }] })).status, 423);
+  assert.equal((await request('operations', { expectedRevision: lockedAgain.revision, operations: [{ type: 'pageMargin', value: changedMargin + 1 }] }, { lockId: laterLock.data.lockId })).status, 200);
+  assert.equal(await body.evaluate(el => getComputedStyle(el).paddingLeft), `${changedMargin + 1}px`);
+  assert.equal((await request('operations', { expectedRevision: lockedAgain.revision + 1, operations: [{ type: 'undo' }] }, { lockId: laterLock.data.lockId })).status, 200);
+  await releaseLayoutLock(laterLock.data.lockId);
   const styled = current.nodes.find(n => n.type === 'paragraph'); assert.ok(styled);
   const inlineFrom = styled.text.indexOf('GUI文字探针');
   current = await op({ type: 'style', nodeId: styled.id, style: { fontSize: 18, color: '#005fc7' } },
@@ -156,7 +213,7 @@ try {
     { type: 'convertBlock', block: 'image', nodeId: blank.id, assetId: 'toString' },
   ] });
   assert.equal(invalidAsset.status, 422);
-  assert.deepEqual(await snapshot(), empty);
+  assert.deepEqual(await snapshot(), { ...empty, layoutLocked: false });
   assert.equal(runtime.store.current.revision, empty.revision);
   assert.deepEqual(runtime.store.current.doc, empty.doc);
   const converted = await op({ type: 'convertBlock', block: 'image', nodeId: blank.id, assetId: newRef.slice(6), alt: 'AI 转换的图片' });

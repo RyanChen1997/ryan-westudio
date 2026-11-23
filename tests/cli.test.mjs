@@ -43,9 +43,10 @@ test('CLI: freeze Word before AI structuring, then check source before starting 
   assert.equal(manifest.sourceHash, sourceHash(source));
   const structuredFile = path.join(project, 'structured.md');
   await fs.writeFile(structuredFile, '---\ntitle: "结构化后的标题"\n---\n\n' + source.replace(/^# /m, '## '));
-  const running = await start(['--project', project, '--md', structuredFile, '--source-md', sourceFile]);
+  const running = await start(['--project', project, '--md', structuredFile, '--source-md', sourceFile, '--ai-layout-lock']);
   try {
     assert.match(running.output, /原文文字一致性：通过/);
+    assert.match(running.output, /^AI_LAYOUT_LOCK_ID=[0-9a-f-]{36}$/m);
     const saved = JSON.parse(await fs.readFile(path.join(project, 'project.json'), 'utf8'));
     assert.equal(saved.sourceValidation.passed, true);
     assert.equal(saved.sourceValidation.sourceHash, manifest.sourceHash);

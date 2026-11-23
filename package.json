@@ -1,6 +1,6 @@
 {
   "name": "ryan-westudio",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "本地 Tiptap 公众号协作编辑器",
   "scripts": {
     "build": "vite build",

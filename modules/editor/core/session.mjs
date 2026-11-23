@@ -1,5 +1,5 @@
 import { Editor } from '@tiptap/core';
-import { TextSelection, NodeSelection } from '@tiptap/pm/state';
+import { Plugin, TextSelection, NodeSelection } from '@tiptap/pm/state';
 import { closeHistory } from '@tiptap/pm/history';
 import { extensions, assignIds, validateStyle, validatePageMargin, visualKeys } from './schema.mjs';
 import { IMAGE_SCALE_MAX, validateImageScale } from './image-scale.mjs';
@@ -61,7 +61,12 @@ function focusBlock(tr, pos, node) {
   tr.scrollIntoView();
 }
 export class EditorSession {
-  constructor(snapshot, { element, onChange = () => {}, onSelection = () => {} } = {}) {
+  #layoutLocked;
+  #connected = true;
+  #applyingAI = false;
+
+  constructor(snapshot, { element, layoutLocked = false, onChange = () => {}, onSelection = () => {} } = {}) {
+    this.#layoutLocked = layoutLocked;
     this.projectId = snapshot.projectId;
     this.revision = snapshot.revision;
     this.assets = snapshot.assets || {};
@@ -76,7 +81,9 @@ export class EditorSession {
     register(doc);
     this.editor = new Editor({
       element: element || document.createElement('div'), extensions: extensions(), content: doc,
-      editorProps: { attributes: { 'aria-label': '文章正文', role: 'textbox', 'aria-multiline': 'true' } },
+      editable: !layoutLocked,
+      editorProps: { attributes: () => ({ 'aria-label': '文章正文', role: 'textbox', 'aria-multiline': 'true',
+        'aria-readonly': String(this.#layoutLocked || !this.#connected) }) },
       onTransaction: ({ transaction }) => {
         if (!transaction.docChanged) return;
         this.revision++;
@@ -87,7 +94,23 @@ export class EditorSession {
       onSelectionUpdate: () => onSelection(this.snapshot()),
     });
     this.editor.view.setProps({ plugins: [importedViewsPlugin] });
+    this.editor.registerPlugin(new Plugin({
+      filterTransaction: tr => !tr.docChanged || this.#connected && (!this.#layoutLocked || this.#applyingAI),
+    }));
     this.markdown = toMarkdown(this.editor.getJSON());
+  }
+  setLayoutLocked(locked) {
+    this.#layoutLocked = locked;
+    this.editor.setEditable(this.#connected && !locked, false);
+  }
+  disconnect() {
+    this.#connected = false;
+    this.editor.setEditable(false, false);
+  }
+  executeFromAI(batch) {
+    this.#applyingAI = true;
+    try { return this.execute(batch); }
+    finally { this.#applyingAI = false; }
   }
   imageVersion(id) {
     const { node } = locate(this.editor.state.doc, id);
@@ -118,7 +141,8 @@ export class EditorSession {
     return { formatVersion: 1, projectId: this.projectId, revision: this.revision, doc: JSON.parse(JSON.stringify(this.editor.getJSON())), markdown: this.markdown, assets: this.assets, sourceValidation: this.sourceValidation, nodes, selection: { from, to, anchor, head } };
   }
   execute({ expectedRevision, operations }) {
-    if (!this.editor.isEditable) throw new SessionError('连接已断开，不能继续编辑；请先恢复会话', 409);
+    if (!this.#connected) throw new SessionError('连接已断开，不能继续编辑；请先恢复会话', 409);
+    if (this.#layoutLocked && !this.#applyingAI) throw new SessionError('AI 正在排版，暂时不能编辑', 423);
     if (expectedRevision !== this.revision) throw new SessionError(`版本冲突：当前 ${this.revision}，请求 ${expectedRevision}`, 409);
     if (!Array.isArray(operations) || !operations.length || operations.length > 100) throw new SessionError('operations 需要 1–100 项');
     if (operations.some(op => ['undo', 'redo'].includes(op?.type))) {

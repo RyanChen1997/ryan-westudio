@@ -1,5 +1,5 @@
 import { EditorSession, SessionError } from '../core/session.mjs';
-export async function connectEditor({ onReady, onState, onStatus }) {
+export async function connectEditor({ onReady, onState, onStatus, onLayoutLock }) {
   const token = new URLSearchParams(location.hash.slice(1)).get('token');
   if (token) {
     const auth = await fetch('/api/auth', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
@@ -7,6 +7,22 @@ export async function connectEditor({ onReady, onState, onStatus }) {
     history.replaceState(null, '', location.pathname);
   }
   let session, lease, savedRevision, saveQueue = Promise.resolve(), disposed = false, saveError = null;
+  let layoutLocked = false, layoutEpoch = 0;
+  function updateLayoutLock(locked) {
+    if (layoutLocked === locked) return;
+    layoutLocked = locked;
+    layoutEpoch++;
+    session.setLayoutLocked(locked);
+    onLayoutLock(locked);
+  }
+  function guardLayout() {
+    const epoch = layoutEpoch;
+    const verify = () => {
+      if (layoutLocked || epoch !== layoutEpoch) throw new SessionError('AI 正在排版或已更新稿件，请重新操作', 423);
+    };
+    verify();
+    return verify;
+  }
   const request = async (url, body, method = 'POST') => {
     const result = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Editor-Lease': lease }, body: JSON.stringify(body) });
     const data = result.status === 204 ? null : await result.json();
@@ -33,10 +49,22 @@ export async function connectEditor({ onReady, onState, onStatus }) {
     return { revision: savedRevision, saved: true };
   }
   async function exportCurrent(expectedRevision) {
+    const verify = guardLayout();
     await flush(expectedRevision);
+    verify();
     const result = await request('/api/export', { expectedRevision });
+    verify();
     if (session.revision !== result.revision) throw new SessionError('导出期间内容已变化，请重新复制或导出', 409);
     return result;
+  }
+  async function upload(url, file, type) {
+    const verify = guardLayout();
+    const result = await fetch(url, { method: 'POST', headers: { 'X-Editor-Lease': lease, 'Content-Type': type }, body: file });
+    const asset = await result.json();
+    if (!result.ok) throw new Error(asset.error);
+    verify();
+    session.assets[asset.id] = asset;
+    return asset;
   }
   const ws = new WebSocket(`ws://${location.host}/bridge`);
   ws.onmessage = async ({ data }) => {
@@ -44,24 +72,28 @@ export async function connectEditor({ onReady, onState, onStatus }) {
     if (message.method === 'blocked') { onStatus(message.error); return; }
     if (message.method === 'welcome') {
       lease = message.lease; savedRevision = message.snapshot.revision;
+      layoutLocked = message.layoutLocked === true;
       try {
-        session = new EditorSession(message.snapshot, { onChange: snapshot => { onState(snapshot); enqueue(snapshot); }, onSelection: onState });
+        session = new EditorSession(message.snapshot, { layoutLocked,
+          onChange: snapshot => { onState(snapshot); enqueue(snapshot); }, onSelection: onState });
       } catch (error) { onStatus(`打开编辑器失败：${error.message}`); return; }
       if (disposed) return session.destroy();
+      onLayoutLock(layoutLocked);
       onReady({ session, save: () => flush(session.revision), exportCurrent: () => exportCurrent(session.revision),
-        async upload(file) {
-        const result = await fetch('/api/assets', { method: 'POST', headers: { 'X-Editor-Lease': lease, 'Content-Type': file.type || 'application/octet-stream' }, body: file });
-        const asset = await result.json(); if (!result.ok) throw new Error(asset.error);
-        session.assets[asset.id] = asset; return asset;
-      } });
+        upload: file => upload('/api/assets', file, file.type || 'application/octet-stream'),
+      });
       onState(session.snapshot()); onStatus(`已保存 · Markdown 已同步 · r${savedRevision}`); return;
+    }
+    if (message.method === 'layoutLock') {
+      if (session && !disposed) updateLayoutLock(message.locked === true);
+      return;
     }
     try {
       if (!session) throw new SessionError('编辑器尚未就绪', 409);
       let result;
       if (message.method === 'snapshot') result = session.snapshot();
       else if (message.method === 'operations') {
-        session.execute(message.payload);
+        session.executeFromAI(message.payload);
         const revision = session.revision;
         await flush(revision); result = session.snapshot();
       } else if (message.method === 'syncAsset') {
@@ -75,7 +107,12 @@ export async function connectEditor({ onReady, onState, onStatus }) {
       ws.send(JSON.stringify({ id: message.id, result }));
     } catch (error) { ws.send(JSON.stringify({ id: message.id, error: error.message, status: error.status || 422 })); }
   };
-  ws.onclose = () => { session?.editor.setEditable(false); if (!disposed) onStatus('会话已断开，正文暂停编辑。请确认已保存后刷新恢复。'); };
+  ws.onclose = () => {
+    if (disposed) return;
+    session?.disconnect();
+    onLayoutLock(false);
+    onStatus('会话已断开，正文暂停编辑。请确认已保存后刷新恢复。');
+  };
   ws.onerror = () => onStatus('无法连接本地编辑服务，请通过终端提供的 URL 打开');
   const unload = event => { if (session && (session.revision !== savedRevision || saveError)) { event.preventDefault(); event.returnValue = ''; } };
   // Opening a fresh CLI URL can be a fragment-only navigation in an existing tab.

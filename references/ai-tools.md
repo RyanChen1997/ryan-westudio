@@ -12,13 +12,29 @@ curl -s -H "Authorization: Bearer $AI_TOKEN" "$AI_BASE/snapshot"
 
 只监听本机。认证令牌每次启动随机生成，CLI URL 的 fragment 用于首次 GUI 认证，之后使用按端口隔离名称的 HttpOnly / SameSite=Strict cookie，避免并行项目互相覆盖认证。无跨域/远程访问；不向任意脚本提供 eval。令牌可编辑本项目，只给可信的本机调用者。
 
-所有 tools 都必须有**同一项目唯一活跃浏览器页**。服务端只转发请求和持久化快照；不在 Node 创建另一个编辑器。第二页拒绝写入；无活跃页返回 409。`GET /api/project` 是恢复用磁盘提交，不是 AI 当前快照接口。
+除排版锁控制接口外，tools 都必须有**同一项目唯一活跃浏览器页**。服务端只转发请求和持久化快照；不在 Node 创建另一个编辑器。第二页拒绝写入；无活跃页返回 409。`GET /api/project` 是恢复用磁盘提交，不是 AI 当前快照接口。
+
+## AI 排版锁
+
+- 首轮 AI 排版启动时加 `--ai-layout-lock`，在打开页面前锁定。使用终端输出的 `AI_LAYOUT_LOCK_ID`；不要再发一次获取请求。已打开的会话中，后续 AI 要修改稿件时，先 `POST /api/tools/layout-lock`（无请求体），从 `201` 响应读取 `lockId` 和 `expiresAt`，等同一个活跃页在线后，再读最新 `/snapshot`。若还要为用户打开一个尚未启动的旧稿会话来执行 AI 修改，可同样带启动标志；用户手动恢复默认不锁。
+- 请求都使用 AI Bearer 令牌；锁定期间对 `/operations`、`/assets` 和 `/save` 另加 `X-AI-Layout-Lock: <lockId>`。整项任务只取一次锁，不在批次间解锁。锁定只影响当前会话的用户编辑与输出，不影响阅读或 AI 的受认证操作；复制和导出需等解锁。
+- 排版锁 5 分钟后自动失效；长任务提前 `PUT /api/tools/layout-lock`，携带同一个锁标识续期。`423 AI_LAYOUT_LOCKED` 表示锁被占用或输出暂停；`409 AI_LAYOUT_LOCK_STALE` 表示旧锁已失效。不要退回到无锁写入或盲目重放；重新获取后先读当前版本。锁不进项目存档或撤销历史，刷新页面仍保持本次服务的锁定状态。
+- 确认改动已保存（`/operations` 成功已等待保存；若结果未知，读取快照核对并按需 `/save`）后，`DELETE /api/tools/layout-lock`，携带本次锁标识，收到 `204` 再交付。失败、取消或需要停下来等用户回复时也释放；没有修改可直接解锁。不要把令牌或锁标识发给用户。
+
+```bash
+# 已打开的会话：获取锁后，把响应 lockId 记为 LOCK_ID；首轮则用 CLI 的 AI_LAYOUT_LOCK_ID。
+curl --fail-with-body -sS -X POST -H "Authorization: Bearer $AI_TOKEN" "$AI_BASE/layout-lock"
+# 保持同一把锁；有需要时续期。
+curl --fail-with-body -sS -X PUT -H "Authorization: Bearer $AI_TOKEN" -H "X-AI-Layout-Lock: $LOCK_ID" "$AI_BASE/layout-lock"
+# 最后一次操作已保存后释放。
+curl --fail-with-body -sS -X DELETE -H "Authorization: Bearer $AI_TOKEN" -H "X-AI-Layout-Lock: $LOCK_ID" "$AI_BASE/layout-lock"
+```
 
 ## 快照与定位
 
 `GET /api/tools/snapshot` 返回：
 
-- `projectId`, `revision`，完整 `doc`（Tiptap JSON），最新 `markdown`，`assets` 哈希 ID 映射。
+- `projectId`, `revision`，完整 `doc`（Tiptap JSON），最新 `markdown`，`assets` 哈希 ID 映射；`layoutLocked` 为临时锁状态（仅快照接口返回，不保存）。
 - `sourceValidation`：可选的首次 AI 结构化原文对照报告。stage 为 initial-structuring，哈希指向初始输入；不代表用户后来改动仍与原文相同，不在编辑时重跑。
 - `nodes[]`: `{id,type,position,size,text,attrs,imageVersion?}`；图片额外提供当前活跃页内的 `imageVersion`，用于异步替换的新鲜度保护（不是持久版本，刷新后须重取）。持久 UUID 跨保存恢复，节点删除后失效；拆分产生新 ID。
 - `selection`: `{from,to,anchor,head}`（ProseMirror 文档位置）。
@@ -75,10 +91,10 @@ style 支持 `fontSize`（10–72 的字号数值，界面显示如 `16`，CSS �
 
 ```bash
 # 先读快照，使用它实际返回的 revision、id。示例值不可照抄覆盖。
-curl -s -H "Authorization: Bearer $AI_TOKEN" -H 'Content-Type: application/json' \
+curl -s -H "Authorization: Bearer $AI_TOKEN" -H "X-AI-Layout-Lock: $LOCK_ID" -H 'Content-Type: application/json' \
   "$AI_BASE/operations" -d '{"expectedRevision":12,"operations":[{"type":"insertBlock","block":"card","text":"可编辑的卡片正文","afterId":"目标块UUID"},{"type":"insertBlock","block":"decoration","afterId":"目标块UUID"}]}'
 
-curl -s -H "Authorization: Bearer $AI_TOKEN" -H 'Content-Type: application/json' \
+curl -s -H "Authorization: Bearer $AI_TOKEN" -H "X-AI-Layout-Lock: $LOCK_ID" -H 'Content-Type: application/json' \
   "$AI_BASE/operations" -d '{"expectedRevision":13,"operations":[{"type":"template","templateId":"blue-sequence"}]}'
 ```
 
@@ -93,7 +109,7 @@ curl -s -H "Authorization: Bearer $AI_TOKEN" -H 'Content-Type: application/json'
 在用户要求加图或换图时，向 `POST /api/tools/assets` 发送一张现成本地图片。必须使用 Bearer 令牌和 `Content-Type: application/octet-stream`，支持 PNG、JPEG、WebP、GIF（最多 25 MiB）。本地转成 PNG，GIF 取首帧；接口不收 URL、文件路径或 SVG，也不向外部服务上传。
 
 ```bash
-curl --fail-with-body -sS -H "Authorization: Bearer $AI_TOKEN" \
+curl --fail-with-body -sS -H "Authorization: Bearer $AI_TOKEN" -H "X-AI-Layout-Lock: $LOCK_ID" \
   -H 'Content-Type: application/octet-stream' --data-binary '@/path/to/image.png' "$AI_BASE/assets"
 ```
 
