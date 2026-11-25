@@ -89,7 +89,7 @@ https://github.com/RyanChen1997/ryan-westudio
 | 复刻其他公众号文章的排版，并加入私人模板库 | — | ✓ |
 | 确认后直接推送到公众号草稿箱 | — | ✓ |
 
-**Pro 版：99 元。一次购买，永久使用，并可持续获取后续更新。** [购买 Pro 版](https://westudio.airyanchen.cc/)
+**Pro 版：69 元。一次购买，永久使用，并可持续获取后续更新。** [购买 Pro 版](https://westudio.airyanchen.cc/)
 
 ## 特色功能
 
