@@ -16,11 +16,12 @@ import wycombePicnic from './presets/wycombe-picnic/index.mjs';
 import xiaomiKeynote from './presets/xiaomi-keynote/index.mjs';
 import lilacNotes from './presets/seneasy-lilac-notes/index.mjs';
 import blueRule from './presets/seneasy-blue-rule/index.mjs';
+import violetFieldNotes from './presets/violet-field-notes/index.mjs';
 
 export const templates = Object.freeze([
   apricotNotes, bciWeekly, beijingArtCalendar, blueSequence, ceramicExhibition, cinnabarChapters,
   coffeeDialogue, cosmosStory, cyanReport, moonlitCopybook, palaceGuide, pingshanBlueGold,
-  sakuraCampus, springArtGuide, wycombePicnic, xiaomiKeynote, lilacNotes, blueRule,
+  sakuraCampus, springArtGuide, wycombePicnic, xiaomiKeynote, lilacNotes, blueRule, violetFieldNotes,
 ]);
 const byId = new Map(templates.map(template => [template.id, template]));
 if (byId.size !== templates.length) throw new Error('模板 ID 重复');
@@ -36,6 +37,7 @@ export function getTemplate(id) {
 // Fallback applies to saved projects, never to explicit template selection.
 export function replacementTemplateId(id) {
   if (byId.has(id)) return undefined;
+  if (id === 'user-violet-field-notes') return violetFieldNotes.id;
   return id === 'wechat-blue-yellow' ? TECH_TEMPLATE_ID : DEFAULT_TEMPLATE_ID;
 }
 

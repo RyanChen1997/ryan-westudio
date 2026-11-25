@@ -5,7 +5,7 @@
 <h1 align="center">把排版交给 AI，把时间留给内容</h1>
 
 <p align="center">
-  <strong>Ryan-WeStudio</strong> 是一个 AI 公众号排版 Skill，内置 18 套模板，帮你快速排好文章，支持后期微调。完成后可复制到公众号。
+  <strong>Ryan-WeStudio</strong> 是一个 AI 公众号排版 Skill，内置 19 套模板，帮你快速排好文章，支持后期微调。完成后可复制到公众号。
 </p>
 
 <p align="center">
@@ -80,7 +80,7 @@ https://github.com/RyanChen1997/ryan-westudio
 | --- | :---: | :---: |
 | 导入 Word / Markdown，保留可读取的本地配图（文章链接由 Agent 先转成本地文稿） | ✓ | ✓ |
 | AI 自动排版，首次整理后核对原文 | ✓ | ✓ |
-| 内置多套排版模板，支持一键切换版式 | 18 套 | 43 套 |
+| 内置多套排版模板，支持一键切换版式 | 19 套 | 44 套 |
 | 内置所见即所得编辑器，排版后可自由修改文字与样式 | ✓ | ✓ |
 | AI 协同修改、手动插图与换图 | ✓ | ✓ |
 | 让 AI 在编辑器中添加或替换本地图片 | ✓ | ✓ |
@@ -117,7 +117,7 @@ https://github.com/RyanChen1997/ryan-westudio
 
 看到喜欢的公众号排版，只需把文章链接或清晰截图发给 Agent，就能高还原度地复刻出神韵一致的专属版式——无论是精巧的章牌编号、标题与底板的层次关系，还是全文的色彩搭配、字距行距与留白节奏，都能精准捕捉并沉淀到你的私人模板库中，随时套用到自己的文章上。**复刻的是版式设计与视觉美感，不搬运对方的文字与图片。**
 
-**六套公众号文章复刻对照** · 左侧是公众号原文的版式局部，右侧是套用对应模板后导出的[同一篇样稿](assets/readme/samples/clone-demo.md)。点击图片可放大查看。这里展示的是 Pro 的复刻能力；本仓库内置的 [18 套模板](references/style-presets.md) 可在编辑器中选用。
+**六套公众号文章复刻对照** · 左侧是公众号原文的版式局部，右侧是套用对应模板后导出的[同一篇样稿](assets/readme/samples/clone-demo.md)。点击图片可放大查看。这里展示的是 Pro 的复刻能力；本仓库内置的 [19 套模板](references/style-presets.md) 可在编辑器中选用。
 
 <p align="center">
   <a href="assets/readme/clone-wechat-frost-chrysanthemum.webp"><img src="assets/readme/clone-wechat-frost-chrysanthemum.webp" width="760" alt="原文章与复刻后对照：橙色花饰章牌和正文"></a>

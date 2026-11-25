@@ -17,14 +17,14 @@ installDOM();
 const run = (session, ...operations) => session.execute({ expectedRevision: session.revision, operations });
 const firstParagraph = session => session.snapshot().nodes.find(n => n.type === 'paragraph');
 
-test('registry ships exactly the 18 selected templates', async () => {
+test('registry ships exactly the 19 selected templates', async () => {
   assert.deepEqual(templates.map(t => t.id), [
     'apricot-notes', 'bci-weekly', 'beijing-art-calendar', 'blue-sequence', 'ceramic-exhibition',
     'cinnabar-chapters', 'coffee-dialogue', 'cosmos-story', 'cyan-report', 'moonlit-copybook',
     'palace-guide', 'pingshan-blue-gold', 'sakura-campus', 'spring-art-guide', 'wycombe-picnic',
-    'xiaomi-keynote', 'seneasy-lilac-notes', 'seneasy-blue-rule',
+    'xiaomi-keynote', 'seneasy-lilac-notes', 'seneasy-blue-rule', 'violet-field-notes',
   ]);
-  for (const id of ['elegant-minimal', 'wechat-blue-yellow', 'user-seneasy-starlight']) assert.throws(() => getTemplate(id), /未知模板/);
+  for (const id of ['elegant-minimal', 'wechat-blue-yellow', 'user-seneasy-starlight', 'user-violet-field-notes']) assert.throws(() => getTemplate(id), /未知模板/);
   assert.equal(recommendTemplate('日常笔记'), DEFAULT_TEMPLATE_ID);
   assert.equal(recommendTemplate('科技资讯'), TECH_TEMPLATE_ID);
   assert.deepEqual((await fs.readdir('modules/templates/presets')).sort(), templates.map(t => t.id).sort());
@@ -249,6 +249,7 @@ test('page margin: visual-only, undoable, durable, exported and reset on templat
 test('store: retired presets migrate once without rewriting article content or user styles', async t => {
   for (const [retired, replacement] of [
     ['elegant-minimal', DEFAULT_TEMPLATE_ID], ['wechat-blue-yellow', TECH_TEMPLATE_ID], ['user-seneasy-starlight', DEFAULT_TEMPLATE_ID], ['jade-docs', DEFAULT_TEMPLATE_ID],
+    ['user-violet-field-notes', 'violet-field-notes'],
   ]) {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'wechat-retired-preset-'));
     t.after(() => fs.rm(directory, { recursive: true, force: true }));
