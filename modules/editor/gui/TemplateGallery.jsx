@@ -1,10 +1,12 @@
 import React from 'react';
 import { Button } from '@astryxdesign/core/Button';
 import { Grid } from '@astryxdesign/core/Grid';
+import { HStack } from '@astryxdesign/core/Stack';
 import { Section } from '@astryxdesign/core/Section';
 import { Text } from '@astryxdesign/core/Text';
 import { Check } from 'lucide-react';
 import { templates } from '../../templates/registry.mjs';
+import categories from '../../templates/gallery-categories.json';
 import { parseMarkdown } from '../core/markdown.mjs';
 import { renderArticle } from '../render/article.mjs';
 import { liveImage } from '../render/paiban-design.mjs';
@@ -16,17 +18,26 @@ const thumbnails = presets => presets.map(({ id, name }) => ({
   id, name, html: renderArticle({ ...example, attrs: { ...example.attrs, templateId: id } }, liveImage),
 }));
 const builtins = thumbnails(templates);
+const categoryButtons = Object.entries(categories.labels);
 
-export function TemplateGallery({ selected, onSelect, disabled }) {
-  return <Section padding={0} className="template-gallery-scroll" role="group" aria-label="排版模板卡片">
-    <Grid columns={{ minWidth: 108, max: 2 }} gap={3} width="100%">
-      {builtins.map(({ id, name, html }) => <Section key={id} padding={0} className="template-card" data-selected={selected === id}>
-        <TemplateThumbnail name={name} html={html} />
-        <Text as="span" className="template-card-tint" aria-hidden="true" />
-        <Text as="span" className="template-card-check" aria-hidden="true"><Check size={13} strokeWidth={2.5} /></Text>
-        <Button label={name} variant="ghost" className="template-select" isDisabled={disabled} aria-pressed={selected === id}
-          onClick={() => { if (selected !== id) onSelect(id); }} />
-      </Section>)}
-    </Grid>
+export function TemplateGallery({ selected, category, onCategoryChange, onSelect, disabled }) {
+  const active = category ?? categories.assignments[selected];
+  const designs = builtins.filter(({ id }) => categories.assignments[id] === active);
+  return <Section padding={0} className="template-gallery">
+    <HStack role="group" aria-label="模板分类" gap={1} wrap="wrap">
+      {categoryButtons.map(([id, label]) => <Button key={id} label={label} variant="ghost" size="sm"
+        className="template-category" aria-pressed={active === id} onClick={() => onCategoryChange(id)} />)}
+    </HStack>
+    <Section key={active} padding={0} className="template-gallery-scroll" role="group" aria-label="排版模板卡片">
+      <Grid columns={{ minWidth: 108, max: 2 }} gap={3} width="100%">
+        {designs.map(({ id, name, html }) => <Section key={id} padding={0} className="template-card" data-selected={selected === id}>
+          <TemplateThumbnail name={name} html={html} />
+          <Text as="span" className="template-card-tint" aria-hidden="true" />
+          <Text as="span" className="template-card-check" aria-hidden="true"><Check size={13} strokeWidth={2.5} /></Text>
+          <Button label={name} variant="ghost" className="template-select" isDisabled={disabled} aria-pressed={selected === id}
+            onClick={() => { if (selected !== id) onSelect(id); }} />
+        </Section>)}
+      </Grid>
+    </Section>
   </Section>;
 }

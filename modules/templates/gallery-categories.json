@@ -1,0 +1,29 @@
+{
+  "labels": {
+    "formal": "企业政务",
+    "minimal": "清新简约",
+    "festive": "活动节庆",
+    "creative": "创意版式"
+  },
+  "assignments": {
+    "apricot-notes": "festive",
+    "bci-weekly": "formal",
+    "beijing-art-calendar": "minimal",
+    "blue-sequence": "minimal",
+    "ceramic-exhibition": "formal",
+    "cinnabar-chapters": "minimal",
+    "coffee-dialogue": "minimal",
+    "cosmos-story": "minimal",
+    "cyan-report": "formal",
+    "moonlit-copybook": "creative",
+    "palace-guide": "creative",
+    "pingshan-blue-gold": "formal",
+    "sakura-campus": "festive",
+    "spring-art-guide": "creative",
+    "wycombe-picnic": "festive",
+    "xiaomi-keynote": "formal",
+    "seneasy-lilac-notes": "minimal",
+    "seneasy-blue-rule": "minimal",
+    "violet-field-notes": "creative"
+  }
+}

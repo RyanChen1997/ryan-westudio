@@ -94,6 +94,12 @@ body {overflow:hidden;-webkit-font-smoothing:antialiased;}
 .studio .inspector-tabs [aria-selected="true"] {color:var(--accent);background:var(--surface);box-shadow:0 2px 7px #30364f08;}
 .inspector-content {flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;padding:2px;}
 .inspector-title {font-size:20px!important;font-weight:550!important;line-height:1.5!important;margin-bottom:20px!important;color:var(--fg);}
+.template-gallery {display:flex;flex-direction:column;height:100%;min-height:0;gap:var(--space-3);}
+.template-gallery-scroll {flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;}
+.studio .astryx-button.template-category {min-height:2rem;height:auto;padding-inline:var(--space-2);}
+.studio .astryx-button.template-category[aria-pressed="true"] {color:var(--accent-hover);}
+.template-gallery-empty {display:block;padding:var(--space-3) var(--space-2);color:var(--muted);}
+@media(pointer:coarse) {.studio .astryx-button.template-category {min-width:2.75rem;min-height:2.75rem;}}
 .template-card {position:relative;min-width:0;padding:7px 7px 39px;border:1px solid var(--border);border-radius:var(--card-radius);background:var(--surface);overflow:hidden;}
 .template-card[data-selected="true"] {border-color:var(--selected-border);}
 .template-card .template-cover {height:172px;overflow:hidden;border-radius:var(--control-radius);background:var(--surface-warm);}
@@ -196,7 +202,7 @@ body {overflow:hidden;-webkit-font-smoothing:antialiased;}
   .editor-header-start{grid-column:1;grid-row:1;}.editor-title-field{width:100%;}.preview-controls{grid-column:1;grid-row:2;align-self:start;}.editor-actions{grid-column:1;grid-row:3;justify-self:center;gap:8px;}
   .editor-layout{display:flex;flex:initial;flex-direction:column;padding:17px 13px;gap:22px;min-height:auto;}
   .editor-stage{overflow:visible;padding:0 28px 24px;}.studio-paper{max-width:100%;}.inspector{min-height:390px;overflow:visible;padding:23px;}
-  .inspector-content{overflow:visible;}.template-gallery-scroll{max-height:min(55dvh,460px);overflow:auto;scrollbar-width:thin;}.template-card .template-cover{height:145px;}
+  .inspector-content{overflow:visible;}.template-gallery{height:auto;}.template-gallery-scroll{max-height:min(55dvh,460px);}.template-card .template-cover{height:145px;}
   .editor-tools{padding:6px;}.insert-menu-content{right:0;}
 }
 @media(prefers-reduced-motion:reduce) {.studio *{transition:none!important;scroll-behavior:auto!important;}}

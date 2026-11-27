@@ -71,6 +71,7 @@ export default function EditorFrame() {
   const [copying, setCopying] = useState(false), [layoutLocked, setLayoutLocked] = useState(false);
   const [night, setNight] = useState(false), [device, setDevice] = useState('desktop');
   const [panel, setPanel] = useState('templates');
+  const [templateCategory, setTemplateCategory] = useState(null);
   const [promotionOpen, setPromotionOpen] = useState(false);
   const uploadRef = useRef(null), fontRef = useRef(null), uploadTarget = useRef(null), toolsRef = useRef(null);
   const uploadGenerations = useRef(new Map()), uploadEpoch = useRef(0), alive = useRef(true);
@@ -241,10 +242,9 @@ export default function EditorFrame() {
             tabIndex={panel === value ? 0 : -1} aria-selected={panel === value} aria-controls={`${panelId}-content`} onClick={() => changePanel(value)} />)}
         </Section>
         <Section padding={0} className="inspector-content" role="tabpanel" id={`${panelId}-content`} aria-labelledby={`${panelId}-${panel}`}>
-          {panel === 'templates' ? <>
-            <Heading level={2} className="inspector-title">排版模板</Heading>
-            <TemplateGallery selected={snapshot.doc.attrs.templateId} disabled={layoutLocked} onSelect={templateId => execute({ type: 'template', templateId })} />
-          </> : <>
+          {panel === 'templates' ? <TemplateGallery selected={snapshot.doc.attrs.templateId}
+            category={templateCategory} onCategoryChange={setTemplateCategory} disabled={layoutLocked}
+            onSelect={templateId => execute({ type: 'template', templateId })} /> : <>
             <Heading level={2} className="inspector-title">样式调整</Heading>
             <Heading level={3} className="adjustment-heading">格式参数</Heading>
             <Section padding={0} className="format-parameter">

@@ -6,6 +6,7 @@ import { chromium } from 'playwright';
 import sharp from 'sharp';
 import { createEditorServer } from '../modules/editor/tools/server.mjs';
 import { templates } from '../modules/templates/registry.mjs';
+import categories from '../modules/templates/gallery-categories.json' with { type: 'json' };
 
 const project = await fs.mkdtemp(path.join(os.tmpdir(), 'wechat-fixes-browser-'));
 const evidence = process.env.FIX_EVIDENCE_DIR || await fs.mkdtemp(path.join(os.tmpdir(), 'wechat-fixes-evidence-'));
@@ -56,6 +57,9 @@ try {
   await page.screenshot({ path: path.join(evidence, 'latest-image-preserved.png') });
 
   // The sample previews don't use the user's article. A visible PNG still loads with auth in its scriptless frame.
+  const filters = page.getByRole('group', { name: '模板分类', exact: true });
+  const category = name => filters.getByRole('button', { name, exact: true });
+  await category(categories.labels[categories.assignments['spring-art-guide']]).click();
   const preview = page.locator('.template-cover iframe[title="春日观展模板缩略图"]');
   await preview.scrollIntoViewIfNeeded();
   await page.waitForFunction(() => {
@@ -63,7 +67,11 @@ try {
     const images = [...(frame?.contentDocument?.images || [])];
     return images.length > 0 && images.every(image => image.complete && image.naturalWidth > 0);
   });
-  const frames = await page.locator('.template-cover iframe').evaluateAll(frames => frames.map(frame => frame.getAttribute('sandbox')));
+  const frames = [];
+  for (const label of Object.values(categories.labels)) {
+    await category(label).click();
+    frames.push(...await page.locator('.template-cover iframe').evaluateAll(frames => frames.map(frame => frame.getAttribute('sandbox'))));
+  }
   assert.equal(frames.length, templates.length);
   assert.ok(frames.every(sandbox => sandbox === 'allow-same-origin'));
   assert.equal((await fetch(`${runtime.url}/assets/${source(await snapshot()).slice(6)}`)).status, 401, 'resource auth must remain enforced');

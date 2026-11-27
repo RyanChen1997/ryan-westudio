@@ -5,6 +5,7 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { createEditorServer } from '../modules/editor/tools/server.mjs';
 import { templates } from '../modules/templates/registry.mjs';
+import categories from '../modules/templates/gallery-categories.json' with { type: 'json' };
 import { semantics } from '../modules/editor/core/markdown.mjs';
 
 const project = await fs.mkdtemp(path.join(os.tmpdir(), 'wechat-paiban-editor-'));
@@ -38,8 +39,21 @@ try {
   const initial = await snapshot();
   assert.equal(initial.sourceValidation.passed, true);
   const gallery = page.getByRole('group', { name: '排版模板卡片' });
-  assert.equal(await gallery.getByRole('button').count(), templates.length);
-  assert.equal(await gallery.getByRole('button', { name: /极简雅致|公众号蓝黄线框/ }).count(), 0);
+  const filters = page.getByRole('group', { name: '模板分类', exact: true });
+  const category = name => filters.getByRole('button', { name, exact: true });
+  assert.equal(await page.getByRole('heading', { name: '排版模板', exact: true }).count(), 0);
+  assert.deepEqual(await filters.getByRole('button').allTextContents(), ['企业政务', '清新简约', '活动节庆', '创意版式']);
+  assert.deepEqual(Object.keys(categories.assignments).sort(), templates.map(({ id }) => id).sort());
+  assert.ok(Object.values(categories.assignments).every(id => Object.hasOwn(categories.labels, id)));
+  assert.equal(await category(categories.labels[categories.assignments[initial.doc.attrs.templateId]]).getAttribute('aria-pressed'), 'true');
+  for (const [id, label] of Object.entries(categories.labels)) {
+    await category(label).press('Enter');
+    assert.equal(await category(label).getAttribute('aria-pressed'), 'true');
+    assert.deepEqual(await gallery.getByRole('button').allTextContents(), templates
+      .filter(template => categories.assignments[template.id] === id).map(({ name }) => name));
+  }
+  await category(categories.labels[categories.assignments['apricot-notes']]).click();
+  assert.deepEqual(await snapshot(), initial, 'category changes only filter cards');
   const apricot = gallery.getByRole('button', { name: '杏暖手记', exact: true });
   const hoverStyle = () => apricot.evaluate(button => {
     const card = button.closest('.template-card');
