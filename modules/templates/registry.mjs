@@ -17,11 +17,15 @@ import xiaomiKeynote from './presets/xiaomi-keynote/index.mjs';
 import lilacNotes from './presets/seneasy-lilac-notes/index.mjs';
 import blueRule from './presets/seneasy-blue-rule/index.mjs';
 import violetFieldNotes from './presets/violet-field-notes/index.mjs';
+import amberFestival from './presets/amber-festival/index.mjs';
+import blueSwatches from './presets/blue-swatches/index.mjs';
+import pineOrangePoster from './presets/pine-orange-poster/index.mjs';
 
 export const templates = Object.freeze([
   apricotNotes, bciWeekly, beijingArtCalendar, blueSequence, ceramicExhibition, cinnabarChapters,
   coffeeDialogue, cosmosStory, cyanReport, moonlitCopybook, palaceGuide, pingshanBlueGold,
   sakuraCampus, springArtGuide, wycombePicnic, xiaomiKeynote, lilacNotes, blueRule, violetFieldNotes,
+  amberFestival, blueSwatches, pineOrangePoster,
 ]);
 const byId = new Map(templates.map(template => [template.id, template]));
 if (byId.size !== templates.length) throw new Error('模板 ID 重复');
@@ -38,6 +42,9 @@ export function getTemplate(id) {
 export function replacementTemplateId(id) {
   if (byId.has(id)) return undefined;
   if (id === 'user-violet-field-notes') return violetFieldNotes.id;
+  if (id === 'user-amber-festival') return amberFestival.id;
+  if (id === 'user-blue-swatches') return blueSwatches.id;
+  if (id === 'user-pine-orange-poster') return pineOrangePoster.id;
   return id === 'wechat-blue-yellow' ? TECH_TEMPLATE_ID : DEFAULT_TEMPLATE_ID;
 }
 

@@ -17,12 +17,13 @@ installDOM();
 const run = (session, ...operations) => session.execute({ expectedRevision: session.revision, operations });
 const firstParagraph = session => session.snapshot().nodes.find(n => n.type === 'paragraph');
 
-test('registry ships exactly the 19 selected templates', async () => {
+test('registry ships exactly the 22 selected templates', async () => {
   assert.deepEqual(templates.map(t => t.id), [
     'apricot-notes', 'bci-weekly', 'beijing-art-calendar', 'blue-sequence', 'ceramic-exhibition',
     'cinnabar-chapters', 'coffee-dialogue', 'cosmos-story', 'cyan-report', 'moonlit-copybook',
     'palace-guide', 'pingshan-blue-gold', 'sakura-campus', 'spring-art-guide', 'wycombe-picnic',
     'xiaomi-keynote', 'seneasy-lilac-notes', 'seneasy-blue-rule', 'violet-field-notes',
+    'amber-festival', 'blue-swatches', 'pine-orange-poster',
   ]);
   for (const id of ['elegant-minimal', 'wechat-blue-yellow', 'user-seneasy-starlight', 'user-violet-field-notes']) assert.throws(() => getTemplate(id), /未知模板/);
   assert.equal(recommendTemplate('日常笔记'), DEFAULT_TEMPLATE_ID);
@@ -30,6 +31,17 @@ test('registry ships exactly the 19 selected templates', async () => {
   assert.deepEqual((await fs.readdir('modules/templates/presets')).sort(), templates.map(t => t.id).sort());
   await assert.rejects(fs.stat('scripts/presets'));
 });
+test('Pine Orange Poster: the opener is unique and ignores card headings', () => {
+  const id = 'pine-orange-poster';
+  const chapters = Array.from({ length: 14 }, (_, index) => `# 章节 ${index + 1}`).join('\n\n');
+  const card = ':::card\n# 卡片标题\n:::\n';
+  const render = text => load(renderArticle(parseMarkdown(text, id), ref => ref), null, false);
+  const $ = render(`${card}\n${chapters}`);
+  for (const asset of ['canopy', 'wake', 'finale']) assert.equal($(`img[src="template:${id}:${asset}"]`).length, 1);
+  assert.equal($(`img[src="template:${id}:canopy"]`).closest('[aria-level="1"]').text(), '章节 1');
+  assert.equal(render(card)('img').length, 0);
+});
+
 test('markdown: semantic roundtrip title, Chinese, nested lists, code, captions and cards', () => {
   const md = '---\ntitle: "中文：标题"\n---\n\n# 一级\n\n## 二级\n\n### 三级\n\n中文 **加粗** 与 *斜体* 及 `a*b` [链接](https://example.com)。\n\n> 引用 **重点**\n>\n> 第二段\n\n- 列表\n  - 内层\n\n3. 有序\n4. 第二项\n\n```js\nconsole.log("中文");\n```\n\n![替代文字](<asset:abc> "中文图注")\n\n---\n\n:::card\n卡片 **正文**\n\n第二段\n:::\n';
   const doc = parseMarkdown(md), again = parseMarkdown(toMarkdown(doc));
@@ -249,12 +261,14 @@ test('page margin: visual-only, undoable, durable, exported and reset on templat
 test('store: retired presets migrate once without rewriting article content or user styles', async t => {
   for (const [retired, replacement] of [
     ['elegant-minimal', DEFAULT_TEMPLATE_ID], ['wechat-blue-yellow', TECH_TEMPLATE_ID], ['user-seneasy-starlight', DEFAULT_TEMPLATE_ID], ['jade-docs', DEFAULT_TEMPLATE_ID],
-    ['user-violet-field-notes', 'violet-field-notes'],
+    ['user-violet-field-notes', 'violet-field-notes'], ['user-amber-festival', 'amber-festival'],
+    ['user-blue-swatches', 'blue-swatches'], ['user-pine-orange-poster', 'pine-orange-poster'],
   ]) {
     const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'wechat-retired-preset-'));
     t.after(() => fs.rm(directory, { recursive: true, force: true }));
-    const markdown = '# 标题\n\n保留的正文。\n';
-    const store = new ProjectStore(directory), initial = await store.open({ markdown, sourceMarkdown: markdown });
+    const markdown = '# 标题\n\n保留的正文。\n\n## 小节\n\n原有章节。\n';
+    const templateId = ['amber-festival', 'blue-swatches', 'pine-orange-poster'].includes(replacement) ? replacement : undefined;
+    const store = new ProjectStore(directory), initial = await store.open({ markdown, sourceMarkdown: markdown, templateId });
     const asset = await store.addAsset(await fs.readFile('fixtures/article-sample.png'));
     const session = new EditorSession(initial);
     const id = firstParagraph(session).id;

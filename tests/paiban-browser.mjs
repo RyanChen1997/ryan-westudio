@@ -52,6 +52,9 @@ try {
     assert.deepEqual(await gallery.getByRole('button').allTextContents(), templates
       .filter(template => categories.assignments[template.id] === id).map(({ name }) => name));
   }
+  assert.equal(categories.assignments['amber-festival'], 'festive');
+  assert.equal(categories.assignments['blue-swatches'], 'creative');
+  assert.equal(categories.assignments['pine-orange-poster'], 'creative');
   await category(categories.labels[categories.assignments['apricot-notes']]).click();
   assert.deepEqual(await snapshot(), initial, 'category changes only filter cards');
   const apricot = gallery.getByRole('button', { name: '杏暖手记', exact: true });

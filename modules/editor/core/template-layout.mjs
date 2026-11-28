@@ -88,6 +88,8 @@ function importedNodeView(node, _view, _getPos, descriptors) {
     return el;
   };
   const dom = mount(tree);
+  // Heading mark styles target only the editable text hole, never sibling ornaments.
+  if (node.type.name === 'heading' && contentDOM) contentDOM.dataset.headingContent = '';
   // Only sibling ornaments are noneditable. Ancestors of the content hole must inherit editability.
   for (let ancestor = contentDOM; ancestor && ancestor !== dom; ancestor = ancestor.parentElement) ancestor.removeAttribute('contenteditable');
   if (node.attrs.id) dom.dataset.nodeId = node.attrs.id;

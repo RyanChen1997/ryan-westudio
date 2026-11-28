@@ -1,5 +1,5 @@
 import { getTemplate } from '../../templates/registry.mjs';
-import { arrangePanels } from './panels.mjs';
+import { arrangePanels, topLevelBlocks } from './panels.mjs';
 import { codeBlockInnerStyle, decorationImageStyle, joinCSS, visualCSS } from './visual-style.mjs';
 import { cellAlignment, tableStyles } from '../core/table.mjs';
 import { IMAGE_SCALE_MAX } from '../core/image-scale.mjs';
@@ -39,14 +39,21 @@ export const liveImage = ref => {
   return ref;
 };
 
+const isChapter = node => node.type === 'heading' && node.attrs.level === 1;
+
 export function importedOuterCSS(doc, template) {
   const margin = doc.attrs.pageMargin ?? template.layout.pageMargin;
-  return joinCSS(template.tokens.outer, `padding-left:${margin}px;padding-right:${margin}px;white-space:normal;tab-size:8`);
+  const first = template.tokens.firstChapter;
+  const chapterCSS = first && topLevelBlocks(doc.content).some(isChapter) ? first.outer : '';
+  // Export has no Astryx shell; keep inherited article metrics equal when a preset omits them.
+  return joinCSS('font-size:14px;line-height:1.5', template.tokens.outer, chapterCSS,
+    `padding-left:${margin}px;padding-right:${margin}px;white-space:normal;tab-size:8`);
 }
 
 export function importedMarks(template) {
-  const { strong, em, link, code } = template.tokens.inline;
-  return { bold: strong, italic: em, link: link ?? fallbackTokens.link, code: code ?? fallbackTokens.code };
+  const { strong, headingStrong, em, link, code } = template.tokens.inline;
+  return { bold: strong, headingBold: headingStrong === undefined ? undefined : joinCSS(strong, headingStrong),
+    italic: em, link: link ?? fallbackTokens.link, code: code ?? fallbackTokens.code };
 }
 
 function scaledImage(tree, scale) {
@@ -69,21 +76,26 @@ export function presentation(input, { arrange = true } = {}) {
   const blocks = t.blocks ?? {};
   const doc = arrange ? arrangePanels(input, template.layout) : input;
   const counts = new Map();
-  function sequence(items, context, { end = true, wrapper = null, list = null } = {}) {
-    return items.map((node, index) => plan(node, context, end && index === items.length - 1, wrapper, list && { ...list, index }));
+  let chapters = 0;
+  function sequence(items, context, { end = true, wrapper = null, list = null, topLevel = false } = {}) {
+    return items.map((node, index) => plan(node, context, end && index === items.length - 1, wrapper, list && { ...list, index }, topLevel));
   }
-  function plan(node, context, last, wrapper, list) {
+  function plan(node, context, last, wrapper, list, topLevel = false) {
     const { type, attrs: a = {}, content: children = [] } = node;
     const role = t.roles[context] ?? t.roles.card;
     let tree, inside = [], number = 0, itemNumber = 0;
     if (type === 'designPanel') {
       const frames = template.layout.panel?.frames ?? [['section', '']];
       tree = frames.reduceRight((inner, [tag, css]) => element(tag, css, [inner]), '$children');
-      inside = sequence(children, context, { end: last });
+      inside = sequence(children, context, { end: last, topLevel });
     } else if (type === 'heading') {
       if (t.numbered.includes(a.level)) { number = (counts.get(a.level) || 0) + 1; counts.set(a.level, number); }
+      // Panels are transparent, but headings inside content containers are not chapters.
+      const chapter = t.firstChapter && topLevel && isChapter(node) ? ++chapters : 0;
       const key = `h${a.level}`, cycle = role[`${key}Cycle`];
-      const [tag, css, parts, attrs] = cycle ? cycle[(number - 1) % cycle.length] : role[key];
+      const index = chapter ? chapter - 2 : number - 1;
+      const shape = chapter === 1 ? t.firstChapter.heading : cycle ? cycle[index % cycle.length] : role[key];
+      const [tag, css, parts, attrs] = shape;
       tree = element(tag, css, parts, { ...attrs, role: 'heading', 'aria-level': a.level });
       if (a.fontSize || a.color) tree = mapTree(tree, item => isTextSlot(item) ? element(item[0], joinCSS(item[1], visualCSS({ fontSize: a.fontSize, color: a.color })), item[2], item[3]) : item);
     } else if (type === 'paragraph') {
@@ -121,7 +133,7 @@ export function presentation(input, { arrange = true } = {}) {
     return { node, tree, inside, number, itemNumber, templateId: template.id };
   }
   // The parent's last index is significant; partitioning into panels does not reset it.
-  return { template, doc, children: sequence(doc.content || [], 'main') };
+  return { template, doc, children: sequence(doc.content || [], 'main', { topLevel: true }) };
 }
 
 export function resolveTree(tree, spec, resolveImage) {

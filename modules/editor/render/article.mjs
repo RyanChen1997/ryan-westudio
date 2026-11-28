@@ -31,7 +31,8 @@ export function renderArticle(doc, resolveImage) {
       if (tree === '$children') return spec.inside.map(nodeHTML).join('');
       if (tree === '$text') {
         const nodes = spec.node.content || [];
-        return spec.node.type === 'codeBlock' ? escapeHTML(nodes.map(n => n.text).join('')) : nodes.map(n => renderText(n, marks)).join('') || '<br/>';
+        const activeMarks = spec.node.type === 'heading' && marks.headingBold ? { ...marks, bold: marks.headingBold } : marks;
+        return spec.node.type === 'codeBlock' ? escapeHTML(nodes.map(n => n.text).join('')) : nodes.map(n => renderText(n, activeMarks)).join('') || '<br/>';
       }
       if (typeof tree === 'string') return escapeHTML(tree);
       const [tag, style, children, attrs] = tree;
@@ -49,5 +50,6 @@ export function editorCSS(doc) {
   const inlineSelectors = { bold: 'strong', italic: 'em', code: ':not(pre) > code', link: 'a' };
   const marks = importedMarks(template);
   const rules = Object.entries(inlineSelectors).map(([key, selector]) => `.tiptap ${selector}{${marks[key] || ''}}`).join('');
-  return base + `.studio .tiptap{${importedOuterCSS(doc, template)}}.studio .tiptap *{box-sizing:revert}` + rules;
+  const headingBold = marks.headingBold ? `.tiptap [data-heading-content] strong{${marks.headingBold}}` : '';
+  return base + `.studio .tiptap{${importedOuterCSS(doc, template)}}.studio .tiptap *{box-sizing:revert}` + rules + headingBold;
 }
